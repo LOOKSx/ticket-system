@@ -1040,9 +1040,9 @@ func main() {
 		path := c.Request.URL.Path
 		// Do not handle API routes here
 		if strings.HasPrefix(path, "/api") {
-			return 
+			return
 		}
-		
+
 		// Check if file exists in dist folder
 		// Adjust path based on your Angular build output
 		filePath := filepath.Join("ticket-frontend", "dist", "ticket-frontend", "browser", path)
@@ -1050,11 +1050,15 @@ func main() {
 			c.File(filePath)
 			return
 		}
-		
+
 		// Fallback to index.html for SPA routes
 		indexPath := filepath.Join("ticket-frontend", "dist", "ticket-frontend", "browser", "index.html")
 		c.File(indexPath)
 	})
 
-	r.Run(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	r.Run(":" + port)
 }

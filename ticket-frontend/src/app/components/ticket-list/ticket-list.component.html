@@ -1,0 +1,346 @@
+<section class="panel panel-list">
+  <div class="panel-list-header">
+    <h2>รายการทิกเก็ต (เฉพาะเจ้าหน้าที่)</h2>
+    <div *ngIf="isLoggedIn" class="panel-list-header-actions">
+      <span class="badge badge-neutral">
+        {{ tickets.length }} รายการ
+      </span>
+      <span class="Admin-name-inline">
+        เจ้าหน้าที่: {{ currentAgentName }}
+      </span>
+      <button
+        type="button"
+        class="secondary-button ghost"
+        (click)="requestReset()"
+      >
+        รีเซ็ต
+      </button>
+      <button
+        type="button"
+        class="secondary-button danger"
+        (click)="clearAllTickets()"
+      >
+        ล้างทิกเก็ตทั้งหมด
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="!isLoggedIn" class="empty-state">
+    <h3>สำหรับเจ้าหน้าที่เท่านั้น</h3>
+    <p>กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่จากระบบหลัก จากนั้นรีเฟรชหน้านี้</p>
+
+    <div class="Admin-list" *ngIf="agents.length > 0">
+      <h4>รายชื่อเจ้าหน้าที่ทั้งหมด</h4>
+      <ul>
+        <li *ngFor="let a of agents">
+          <span class="Admin-list-name">{{ a.name }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <ng-container *ngIf="isLoggedIn">
+    <div *ngIf="tickets.length === 0" class="empty-state">
+      <h3>ยังไม่มีทิกเก็ต</h3>
+      <p>เริ่มสร้างทิกเก็ตจากแบบฟอร์มด้านซ้ายเพื่อให้ทีมสนับสนุนรับเรื่อง</p>
+    </div>
+
+    <div class="ticket-tabs" *ngIf="tickets.length > 0">
+      <button
+        type="button"
+        class="ticket-tab"
+        [class.active]="activeCategory === 'all'"
+        (click)="activeCategory = 'all'"
+      >
+        ทั้งหมด
+        <span class="ticket-tab-count">{{ tickets.length }}</span>
+      </button>
+      <button
+        type="button"
+        class="ticket-tab"
+        [class.active]="activeCategory === 'open'"
+        (click)="activeCategory = 'open'"
+      >
+        ใหม่
+        <span class="ticket-tab-count">
+          {{ countByStatus('open') }}
+        </span>
+      </button>
+      <button
+        type="button"
+        class="ticket-tab"
+        [class.active]="activeCategory === 'in_progress'"
+        (click)="activeCategory = 'in_progress'"
+      >
+        กำลังดำเนินการ
+        <span class="ticket-tab-count">
+          {{ countByStatus('in_progress') }}
+        </span>
+      </button>
+      <button
+        type="button"
+        class="ticket-tab"
+        [class.active]="activeCategory === 'closed'"
+        (click)="activeCategory = 'closed'"
+      >
+        ปิดงานแล้ว
+        <span class="ticket-tab-count">
+          {{ countByStatus('closed') }}
+        </span>
+      </button>
+      <button
+        type="button"
+        class="ticket-tab"
+        [class.active]="activeCategory === 'unassigned'"
+        (click)="activeCategory = 'unassigned'"
+      >
+        ยังไม่รับเคส
+        <span class="ticket-tab-count">
+          {{ countUnassigned() }}
+        </span>
+      </button>
+    </div>
+
+    <div class="ticket-table" *ngIf="tickets.length > 0">
+      <div class="ticket-header-row">
+        <div class="ticket-col-status">สถานะ</div>
+        <div class="ticket-col-priority">ความเร่งด่วน</div>
+        <div class="ticket-col-customer">ลูกค้า</div>
+        <div class="ticket-col-main">หัวข้อ / รายละเอียด</div>
+        <div class="ticket-col-assignee">ผู้รับผิดชอบ</div>
+        <div class="ticket-col-actions"></div>
+      </div>
+
+      <ng-container *ngFor="let t of getCategoryTickets()">
+        <div class="ticket-card-wrapper">
+          <div class="ticket-row">
+            <div class="ticket-col-status">
+            <span class="badge" [ngClass]="'status-' + (t.status || 'unknown')">
+              {{ getStatusLabel(t.status) }}
+            </span>
+          </div>
+          <div class="ticket-col-priority">
+            <span class="badge" [ngClass]="'priority-' + (t.priority || 'unknown')">
+              {{ getPriorityLabel(t.priority) }}
+            </span>
+          </div>
+          <div class="ticket-col-customer">
+            {{ t.customer?.name || 'ไม่ระบุ' }}
+          </div>
+          <div class="ticket-col-main" (click)="openDetail(t)">
+            <span class="ticket-title-inline">
+              #{{ t.ID }} {{ t.title }}
+            </span>
+            <span class="ticket-snippet">
+              – {{ t.description }}
+            </span>
+            <span class="ticket-contact-inline">
+              เบอร์ติดต่อ: {{ t.phone_number || '-' }}
+            </span>
+          </div>
+          <div class="ticket-col-assignee">
+            <span>
+              {{ t.assigned_to || 'ยังไม่มีผู้รับเคส' }}
+            </span>
+          </div>
+          <div class="ticket-col-actions">
+            <!-- Unassigned: Show Receive button -->
+            <button
+              type="button"
+              class="primary-button"
+              *ngIf="isLoggedIn && !t.assigned_to"
+              (click)="assignTicket(t)"
+            >
+              รับเคส
+            </button>
+
+            <!-- Assigned to me: Show Actions -->
+            <ng-container *ngIf="isLoggedIn && t.assigned_to === currentAgentName">
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="toggleReplies(t)"
+              >
+                ตอบกลับ
+              </button>
+              
+              <button
+                type="button"
+                class="secondary-button"
+                *ngIf="t.status !== 'closed'"
+                (click)="completeTicket(t)"
+              >
+                ปิดงาน
+              </button>
+
+              <button
+                type="button"
+                class="secondary-button danger"
+                (click)="releaseTicket(t)"
+                title="ส่งคืนเคส"
+              >
+                ส่งคืน
+              </button>
+            </ng-container>
+
+            <!-- Always show Delete for logged in users -->
+            <button
+              type="button"
+              class="secondary-button danger"
+              *ngIf="isLoggedIn"
+              (click)="deleteTicket(t)"
+              title="ลบทิกเก็ต"
+            >
+              ลบ
+            </button>
+          </div>
+        </div>
+
+        <div class="ticket-detail-row" *ngIf="t.showReplies || t.attachment_path">
+          <div class="ticket-detail-cell">
+            <div class="ticket-history" *ngIf="t.showReplies">
+              <div *ngIf="t.replies && t.replies.length; else noHistory">
+                <div class="history-item" *ngFor="let r of t.replies" [class.is-admin]="isAdmin(r.author_role)">
+                  <div class="history-header">
+                    <span class="history-author">
+                      {{ r.author_name || 'ไม่ระบุชื่อ' }}
+                    </span>
+                    <span class="history-role" *ngIf="isAdmin(r.author_role)">
+                      (เจ้าหน้าที่)
+                    </span>
+                    <span class="history-time" *ngIf="r.CreatedAt">
+                      {{ r.CreatedAt | date: 'short' }}
+                    </span>
+                  </div>
+                  <div class="history-message">
+                    {{ r.message }}
+                  </div>
+                </div>
+              </div>
+              <ng-template #noHistory>
+                <div class="history-empty">
+                  ยังไม่มีประวัติการตอบกลับสำหรับทิกเก็ตนี้
+                </div>
+              </ng-template>
+
+              <div class="history-reply-form" *ngIf="isLoggedIn">
+                <textarea
+                  [(ngModel)]="t.newReplyMessage"
+                  rows="2"
+                  placeholder="พิมพ์ข้อความตอบกลับสำหรับทิกเก็ตนี้"
+                ></textarea>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  (click)="submitReply(t)"
+                >
+                  ส่งข้อความตอบกลับ
+                </button>
+              </div>
+              <div class="history-login-hint" *ngIf="!isLoggedIn">
+                เข้าสู่ระบบเจ้าหน้าที่เพื่อเพิ่มการตอบกลับในประวัติของทิกเก็ตนี้
+              </div>
+            </div>
+
+            <div class="ticket-attachment" *ngIf="t.attachment_path">
+              <a
+                [href]="t.attachment_path"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="attachment-pill"
+              >
+                <span class="attachment-dot"></span>
+                <span class="attachment-text">ไฟล์แนบ</span>
+              </a>
+            </div>
+          </div>
+        </div>
+        </div>
+      </ng-container>
+    </div>
+  </ng-container>
+
+  <div
+    class="detail-overlay"
+    *ngIf="detailVisible && detailTicket"
+  >
+    <div class="detail-dialog">
+      <div class="detail-header">
+        <div class="detail-title">
+          <span class="ticket-id">#{{ detailTicket.ID }}</span>
+          <span>{{ detailTicket.title }}</span>
+        </div>
+        <button
+          type="button"
+          class="detail-close"
+          (click)="closeDetail()"
+        >
+          ×
+        </button>
+      </div>
+
+      <div class="detail-meta">
+        <span class="badge" [ngClass]="'status-' + (detailTicket.status || 'unknown')">
+          {{ getStatusLabel(detailTicket.status) }}
+        </span>
+        <span class="badge" [ngClass]="'priority-' + (detailTicket.priority || 'unknown')">
+          ความเร่งด่วน: {{ getPriorityLabel(detailTicket.priority) }}
+        </span>
+      </div>
+
+      <div class="detail-body">
+        <div class="detail-section">
+          <div class="detail-label">รายละเอียด</div>
+          <div class="detail-text">
+            {{ detailTicket.description }}
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">เบอร์ติดต่อ</div>
+          <div class="detail-text">
+            {{ detailTicket.phone_number || '-' }}
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-label">ผู้รับผิดชอบ</div>
+          <div class="detail-text">
+            {{ detailTicket.assigned_to || 'ยังไม่มีผู้รับเคส' }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    class="confirm-overlay"
+    *ngIf="confirmVisible"
+  >
+    <div class="confirm-dialog">
+      <div class="confirm-header">
+        <span class="confirm-title">ข้อความจากระบบ</span>
+      </div>
+      <div class="confirm-body">
+        <p>{{ confirmMessage }}</p>
+      </div>
+      <div class="confirm-actions">
+        <button
+          type="button"
+          class="confirm-button primary"
+          (click)="confirmYes()"
+        >
+          ตกลง
+        </button>
+        <button
+          type="button"
+          class="confirm-button secondary"
+          *ngIf="confirmShowCancel"
+          (click)="confirmNo()"
+        >
+          ยกเลิก
+        </button>
+      </div>
+    </div>
+  </div>
+</section>

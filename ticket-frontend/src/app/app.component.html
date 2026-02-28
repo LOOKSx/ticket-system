@@ -1,0 +1,345 @@
+<div class="page">
+  <header class="header">
+    <div class="header-title">
+      <h1>ระบบจัดการทิกเก็ตบริการลูกค้า</h1>
+      <p>บันทึกและติดตามคำขอจากลูกค้า</p>
+    </div>
+    <div class="header-actions">
+      <ng-container [ngSwitch]="authRole">
+        <ng-container *ngSwitchCase="'customer'">
+          <div class="header-customer-summary">
+            <span class="header-customer-name">
+              ลูกค้า: {{ customerName }}
+            </span>
+            <button
+              type="button"
+              class="header-auth-button secondary"
+              (click)="logoutCustomer()"
+            >
+              ออกจากระบบ
+            </button>
+          </div>
+        </ng-container>
+        <ng-container *ngSwitchCase="'Admin'">
+          <div class="header-customer-summary">
+            <span class="header-customer-name">
+              เจ้าหน้าที่: {{ agentName }}
+            </span>
+            <button
+              type="button"
+              class="header-auth-button secondary"
+              (click)="logoutAgent()"
+            >
+              ออกจากระบบ
+            </button>
+          </div>
+        </ng-container>
+        <ng-container *ngSwitchDefault>
+          <button
+            type="button"
+            class="header-auth-button"
+            (click)="toggleCustomerAuthPanel()"
+          >
+            เข้าสู่ระบบ / ลงทะเบียนลูกค้า
+          </button>
+        </ng-container>
+      </ng-container>
+    </div>
+  </header>
+
+  <div
+    class="auth-backdrop"
+    *ngIf="showCustomerAuthPanel && !authRole"
+    (click)="toggleCustomerAuthPanel()"
+  ></div>
+
+  <section
+    class="header-auth-panel"
+    *ngIf="showCustomerAuthPanel && !authRole"
+  >
+    <div class="auth-panel-grid">
+      <div class="auth-panel-column">
+        <h3>เข้าสู่ระบบลูกค้า/เจ้าหน้าที่</h3>
+        <div class="form-field">
+          <label for="headerCustomerLoginEmail">อีเมล</label>
+          <input
+            id="headerCustomerLoginEmail"
+            type="email"
+            [(ngModel)]="customerLoginEmail"
+            name="headerCustomerLoginEmail"
+            placeholder="เช่น customer@example.com"
+          />
+        </div>
+        <div class="form-field">
+          <label for="headerCustomerLoginPassword">รหัสผ่าน</label>
+          <input
+            id="headerCustomerLoginPassword"
+            type="password"
+            [(ngModel)]="customerLoginPassword"
+            name="headerCustomerLoginPassword"
+            placeholder="กรอกรหัสผ่าน"
+          />
+        </div>
+        <div class="auth-panel-actions">
+          <button
+            type="button"
+            class="header-auth-button secondary"
+            (click)="loginCustomer()"
+          >
+            เข้าสู่ระบบ
+          </button>
+        </div>
+      </div>
+
+      <div class="auth-panel-column">
+        <h3>ลงทะเบียนลูกค้าใหม่</h3>
+        <div class="form-field">
+          <label for="headerCustomerRegisterName">ชื่อ-นามสกุล</label>
+          <input
+            id="headerCustomerRegisterName"
+            type="text"
+            [(ngModel)]="customerRegisterName"
+            name="headerCustomerRegisterName"
+            placeholder="เช่น อนุทิน รวยไม่ไหวแล้ว"
+          />
+        </div>
+        <div class="form-field">
+          <label for="headerCustomerRegisterEmail">อีเมล</label>
+          <input
+            id="headerCustomerRegisterEmail"
+            type="email"
+            [(ngModel)]="customerRegisterEmail"
+            name="headerCustomerRegisterEmail"
+            placeholder="เช่น customer@example.com"
+          />
+        </div>
+        <div class="form-field">
+          <label for="headerCustomerRegisterPassword">รหัสผ่าน</label>
+          <input
+            id="headerCustomerRegisterPassword"
+            type="password"
+            [(ngModel)]="customerRegisterPassword"
+            name="headerCustomerRegisterPassword"
+            placeholder="ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร"
+          />
+        </div>
+        <div class="auth-panel-actions">
+          <button
+            type="button"
+            class="header-auth-button secondary"
+            (click)="registerCustomer()"
+          >
+            ลงทะเบียนและเข้าสู่ระบบ
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p *ngIf="customerAuthMessage" class="auth-panel-message">
+      {{ customerAuthMessage }}
+    </p>
+  </section>
+
+  <main class="layout">
+    <div
+      class="layout-left"
+      *ngIf="authRole !== 'Admin'"
+    >
+      <app-ticket-form
+        (ticketCreated)="onTicketCreated($event)"
+        (formError)="openAlert($event)"
+      ></app-ticket-form>
+
+      <section
+        class="panel panel-list panel-my-tickets"
+        *ngIf="customerIsLoggedIn"
+      >
+        <div class="panel-list-header">
+          <div>
+            <h2>ทิกเก็ตของคุณ</h2>
+            <span class="badge badge-neutral">
+              {{ customerTickets.length }} รายการ
+            </span>
+          </div>
+          <button
+            type="button"
+            class="secondary-button ghost"
+            (click)="resetCustomerTickets()"
+          >
+            รีเซ็ต
+          </button>
+        </div>
+
+        <div *ngIf="customerTickets.length === 0" class="empty-state">
+          <h3>ยังไม่มีทิกเก็ตในบัญชีนี้</h3>
+          <p>
+            สร้างทิกเก็ตจากแบบฟอร์มด้านบน ระบบจะเชื่อมกับบัญชีของคุณโดยอัตโนมัติ
+          </p>
+        </div>
+
+        <div *ngFor="let t of customerTickets" class="ticket-card">
+          <div class="ticket-card-header">
+            <div>
+              <div class="ticket-title">
+                <span class="ticket-id">#{{ t.ID }}</span>
+                <span>{{ t.title }}</span>
+              </div>
+              <div class="ticket-meta">
+                <span>
+                  สถานะ:
+                  {{ getCustomerStatusLabel(t.status) }}
+                </span>
+              </div>
+            </div>
+            <div class="ticket-badges">
+              <span
+                class="badge"
+                [ngClass]="'status-' + (t.status || 'unknown')"
+              >
+                {{ getCustomerStatusLabel(t.status) }}
+              </span>
+              <span
+                class="badge"
+                [ngClass]="'priority-' + (t.priority || 'unknown')"
+              >
+                ความเร่งด่วน: {{ getCustomerPriorityLabel(t.priority) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="ticket-description">
+            <div class="ticket-description-label">รายละเอียด</div>
+            <div>
+              {{ t.description }}
+            </div>
+          </div>
+
+          <p class="ticket-contact">
+            เบอร์ติดต่อ: {{ t.phone_number || '-' }}
+          </p>
+
+          <div class="ticket-attachment" *ngIf="t.attachment_path">
+            <a
+              [href]="t.attachment_path"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="attachment-pill"
+            >
+              <span class="attachment-dot"></span>
+              <span class="attachment-text">ไฟล์แนบ</span>
+            </a>
+          </div>
+
+          <div class="ticket-meta-row">
+            <span class="ticket-assignee">
+              เจ้าหน้าที่ผู้ดูแล:
+              {{ t.assigned_to || 'ยังไม่มีผู้รับเคส' }}
+            </span>
+            <div class="ticket-actions">
+              <button
+                type="button"
+                class="secondary-button ghost"
+                (click)="toggleCustomerReplies(t)"
+              >
+                {{ t.showReplies ? 'ซ่อนประวัติ' : 'ดูประวัติ / ตอบกลับ' }}
+              </button>
+              <button
+                type="button"
+                class="secondary-button danger"
+                (click)="deleteCustomerTicket(t)"
+              >
+                ลบทิกเก็ต
+              </button>
+            </div>
+          </div>
+
+          <div class="ticket-history" *ngIf="t.showReplies">
+            <div *ngIf="t.replies && t.replies.length; else noCustomerHistory">
+              <div
+                class="history-item"
+                *ngFor="let r of t.replies"
+                [ngClass]="{
+                  'history-item-Admin': r.author_role === 'Admin',
+                  'history-item-customer': r.author_role === 'customer'
+                }"
+              >
+                <div class="history-header">
+                  <span class="history-author">
+                    {{ r.author_name || 'ไม่ระบุชื่อ' }}
+                  </span>
+                  <span class="history-role" *ngIf="r.author_role === 'Admin'">
+                    เจ้าหน้าที่
+                  </span>
+                  <span class="history-time" *ngIf="r.CreatedAt">
+                    {{ r.CreatedAt | date: 'short' }}
+                  </span>
+                </div>
+                <div class="history-message">
+                  {{ r.message }}
+                </div>
+              </div>
+            </div>
+            <ng-template #noCustomerHistory>
+              <div class="history-empty">
+                ยังไม่มีประวัติการตอบกลับสำหรับทิกเก็ตนี้
+              </div>
+            </ng-template>
+
+            <div class="history-reply-form">
+              <textarea
+                [(ngModel)]="t.newReplyMessage"
+                rows="2"
+                placeholder="พิมพ์ข้อความตอบกลับสำหรับทิกเก็ตนี้"
+              ></textarea>
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="submitCustomerReply(t)"
+              >
+                ส่งข้อความตอบกลับ
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <app-ticket-list
+      *ngIf="authRole === 'Admin'"
+      [tickets]="tickets"
+      (resetRequested)="onAgentReset()"
+      (ticketUpdated)="onTicketUpdated($event)"
+    ></app-ticket-list>
+  </main>
+
+  <div
+    class="confirm-overlay"
+    *ngIf="confirmVisible"
+  >
+    <div class="confirm-dialog">
+      <div class="confirm-header">
+        <span class="confirm-title">ข้อความจากระบบ</span>
+      </div>
+      <div class="confirm-body">
+        <p>{{ confirmMessage }}</p>
+      </div>
+      <div class="confirm-actions">
+        <button
+          type="button"
+          class="confirm-button primary"
+          (click)="confirmYes()"
+        >
+          ตกลง
+        </button>
+        <button
+          type="button"
+          class="confirm-button secondary"
+          *ngIf="confirmShowCancel"
+          (click)="confirmNo()"
+        >
+          ยกเลิก
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

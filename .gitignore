@@ -1,0 +1,32 @@
+# Go
+*.exe
+*.test
+*.prof
+*.db
+go.work
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+npm-debug.log
+yarn-error.log
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log

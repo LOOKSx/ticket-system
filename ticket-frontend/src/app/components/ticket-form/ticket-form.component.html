@@ -1,0 +1,97 @@
+<section class="panel panel-form">
+  <h2>สร้างทิกเก็ตใหม่</h2>
+  <p class="panel-subtitle">
+    กรอกข้อมูลคำขอให้ครบถ้วนเพื่อให้ทีมสนับสนุนสามารถดำเนินการได้อย่างรวดเร็ว
+  </p>
+
+  <div class="auth-warning" *ngIf="!customerLoggedIn">
+    <div class="auth-warning-title">กรุณาเข้าสู่ระบบ</div>
+    <p class="auth-warning-message">
+      กรุณากรอกเข้าสู่ระบบหรือลงทะเบียนลูกค้าก่อนส่งทิกเก็ต เพื่อให้ระบบเชื่อมทิกเก็ตเข้ากับบัญชีของคุณ
+    </p>
+  </div>
+
+  <form (ngSubmit)="onSubmit()" class="form">
+    <div class="form-field">
+      <label for="title">หัวข้อทิกเก็ต</label>
+      <input
+        id="title"
+        type="text"
+        [(ngModel)]="newTicket.title"
+        name="title"
+        placeholder="สอบถาม หรือปัญหาต่างๆ"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="phone">เบอร์มือถือผู้ติดต่อ</label>
+      <input
+        id="phone"
+        type="tel"
+        [(ngModel)]="newTicket.phone_number"
+        name="phone_number"
+        placeholder="เช่น 09X-XXX-XXXX"
+      />
+      <small class="helper-text">
+        กรุณากรอกเบอร์มือถือ 10 หลัก 
+      </small>
+    </div>
+
+    <div class="form-field">
+      <label for="description">รายละเอียด</label>
+      <textarea
+        id="description"
+        [(ngModel)]="newTicket.description"
+        name="description"
+        rows="4"
+        placeholder="อธิบายปัญหาหรือคำขอ รวมถึงขั้นตอนที่ทำให้เกิดเหตุการณ์นี้"
+      ></textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-field">
+        <label for="priority">ความเร่งด่วน</label>
+        <select id="priority" [(ngModel)]="newTicket.priority" name="priority">
+          <option value="low">ต่ำ</option>
+          <option value="medium">ปานกลาง</option>
+          <option value="high">สูง</option>
+        </select>
+      </div>
+
+      <div class="form-field file-field">
+        <label for="attachment">ไฟล์แนบ (ไม่บังคับ)</label>
+        <div class="file-input-wrapper">
+          <button
+            type="button"
+            class="file-button"
+            (click)="fileInput.click()"
+          >
+            เลือกไฟล์
+          </button>
+          <span class="file-name" *ngIf="selectedFile; else noFile">
+            {{ selectedFile.name }}
+          </span>
+          <ng-template #noFile>
+            <span class="file-name muted">ยังไม่ได้เลือกไฟล์</span>
+          </ng-template>
+          <input
+            #fileInput
+            id="attachment"
+            type="file"
+            (change)="onFileSelected($event)"
+            class="file-input-hidden"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button
+        type="submit"
+        class="primary-button"
+      >
+        ส่งทิกเก็ต
+      </button>
+    </div>
+  </form>
+</section>

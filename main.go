@@ -1035,5 +1035,26 @@ func main() {
 		})
 	}
 
+	// Serve Frontend (Angular) for unknown routes
+	r.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+		// Do not handle API routes here
+		if strings.HasPrefix(path, "/api") {
+			return 
+		}
+		
+		// Check if file exists in dist folder
+		// Adjust path based on your Angular build output
+		filePath := filepath.Join("ticket-frontend", "dist", "ticket-frontend", "browser", path)
+		if _, err := os.Stat(filePath); err == nil {
+			c.File(filePath)
+			return
+		}
+		
+		// Fallback to index.html for SPA routes
+		indexPath := filepath.Join("ticket-frontend", "dist", "ticket-frontend", "browser", "index.html")
+		c.File(indexPath)
+	})
+
 	r.Run(":8080")
 }

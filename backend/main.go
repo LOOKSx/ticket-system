@@ -59,45 +59,7 @@ func main() {
 	ConnectDatabase()
 	r := gin.Default()
 
-	// Serve Frontend (SPA)
-	r.Use(func(c *gin.Context) {
-		path := c.Request.URL.Path
-		// Skip API and Uploads
-		if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/uploads") {
-			c.Next()
-			return
-		}
-
-		// Trim leading slash to ensure relative path join works correctly
-		relativePath := strings.TrimPrefix(path, "/")
-
-		// Try to serve static file
-		staticPath := filepath.Join("ticket-frontend", "dist", "ticket-frontend", "browser", relativePath)
-
-		// Debug: Print path being checked
-		// fmt.Printf("Request: %s -> Check: %s\n", path, staticPath)
-
-		info, err := os.Stat(staticPath)
-		if err == nil && !info.IsDir() {
-			c.File(staticPath)
-			c.Abort()
-			return
-		}
-
-		// If not found, serve index.html for SPA
-		indexPath := filepath.Join("ticket-frontend", "dist", "ticket-frontend", "browser", "index.html")
-
-		// Debug: Verify index exists
-		if _, err := os.Stat(indexPath); err != nil {
-			fmt.Printf("CRITICAL ERROR: index.html not found at %s\n", indexPath)
-			c.String(http.StatusNotFound, "Frontend build not found. Please run 'npm run build' in ticket-frontend folder.")
-			c.Abort()
-			return
-		}
-
-		c.File(indexPath)
-		c.Abort()
-	})
+	// Serve Frontend (SPA) logic is now handled by NoRoute at the end of main()
 
 	if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
 		log.Fatal("Failed to create uploads directory", err)
@@ -1038,11 +1000,11 @@ func main() {
 	// Serve Frontend (Angular) for unknown routes
 	r.NoRoute(func(c *gin.Context) {
 		path := c.Request.URL.Path
-		// Do not handle API routes here
-		if strings.HasPrefix(path, "/api") {
-			return 
+		// Do not handle API routes or Uploads here
+		if strings.HasPrefix(path, "/api") || strings.HasPrefix(path, "/uploads") {
+			return
 		}
-		
+
 		// Find dist folder
 		distPath := "frontend/dist/ticket-frontend/browser" // Default for production
 		if _, err := os.Stat(distPath); os.IsNotExist(err) {
@@ -1064,7 +1026,7 @@ func main() {
 			c.File(filePath)
 			return
 		}
-		
+
 		// Fallback to index.html for SPA routes
 		indexPath := filepath.Join(distPath, "index.html")
 		c.File(indexPath)

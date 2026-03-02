@@ -211,7 +211,7 @@
                 </div>
               </ng-template>
 
-              <div class="history-reply-form" *ngIf="isLoggedIn && t.assigned_to === currentAgentName">
+              <div class="history-reply-form" *ngIf="isLoggedIn && t.assigned_to === currentAgentName && t.status !== 'closed' && t.status !== 'Closed'">
                 <textarea
                   [(ngModel)]="t.newReplyMessage"
                   rows="2"
@@ -231,15 +231,20 @@
             </div>
 
             <div class="ticket-attachment" *ngIf="t.attachment_path">
-              <a
-                [href]="t.attachment_path"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="attachment-pill"
-              >
-                <span class="attachment-dot"></span>
-                <span class="attachment-text">ไฟล์แนบ</span>
-              </a>
+              <div *ngIf="isImage(t.attachment_path); else fileLink" class="attachment-thumbnail-container">
+                <img [src]="t.attachment_path" class="attachment-thumbnail" (click)="openImage(t.attachment_path)" alt="Attachment Thumbnail">
+              </div>
+              <ng-template #fileLink>
+                <a
+                  [href]="t.attachment_path"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="attachment-pill"
+                >
+                  <span class="attachment-dot"></span>
+                  <span class="attachment-text">ไฟล์แนบ</span>
+                </a>
+              </ng-template>
             </div>
           </div>
         </div>
@@ -329,6 +334,13 @@
           ยกเลิก
         </button>
       </div>
+    </div>
+  </div>
+
+  <div class="image-preview-overlay" *ngIf="previewImage" (click)="closeImage()">
+    <div class="image-preview-content" (click)="$event.stopPropagation()">
+      <img [src]="previewImage" class="preview-full-image">
+      <button class="preview-close" (click)="closeImage()">×</button>
     </div>
   </div>
 </section>

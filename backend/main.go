@@ -354,7 +354,7 @@ func main() {
 			}
 
 			var tickets []Ticket
-			if err := DB.Preload("Customer").Find(&tickets).Error; err != nil {
+			if err := DB.Preload("Customer").Order("created_at desc").Find(&tickets).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_load_tickets"})
 				return
 			}
@@ -468,7 +468,7 @@ func main() {
 			}
 
 			var tickets []Ticket
-			if err := DB.Preload("Customer").Where("customer_id = ?", customerID).Find(&tickets).Error; err != nil {
+			if err := DB.Preload("Customer").Where("customer_id = ?", customerID).Order("created_at desc").Find(&tickets).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_load_tickets"})
 				return
 			}

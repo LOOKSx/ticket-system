@@ -43,9 +43,40 @@ export class AppComponent implements OnInit {
   confirmShowCancel = true;
   private pendingConfirmAction: (() => void) | null = null;
 
+  previewImage: string | null = null;
+
   @ViewChild(TicketListComponent) ticketList?: TicketListComponent;
 
   constructor(private ticketService: TicketService) {}
+
+  isImage(path: string): boolean {
+    if (!path) return false;
+    const lower = path.toLowerCase();
+    return lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp');
+  }
+
+  openImage(path: string): void {
+    this.previewImage = path;
+  }
+
+  closeImage(): void {
+    this.previewImage = null;
+  }
+
+  private sortTicketsNewestFirst(list: Ticket[]): Ticket[] {
+    return [...list].sort((a, b) => {
+      const aTime = a.CreatedAt ? Date.parse(a.CreatedAt) : NaN;
+      const bTime = b.CreatedAt ? Date.parse(b.CreatedAt) : NaN;
+
+      if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
+        return bTime - aTime;
+      }
+
+      const aId = a.ID ?? 0;
+      const bId = b.ID ?? 0;
+      return bId - aId;
+    });
+  }
 
   ngOnInit(): void {
     const name = localStorage.getItem('customerName');
@@ -70,7 +101,7 @@ export class AppComponent implements OnInit {
   loadTickets(): void {
     this.ticketService.getTickets().subscribe({
       next: (data) => {
-        this.tickets = data;
+        this.tickets = this.sortTicketsNewestFirst(data);
       },
       error: () => {
         this.tickets = [];
@@ -79,7 +110,7 @@ export class AppComponent implements OnInit {
   }
 
   onTicketCreated(ticket: Ticket): void {
-    this.tickets.push(ticket);
+    this.tickets = this.sortTicketsNewestFirst([...this.tickets, ticket]);
     this.loadCustomerTickets();
     this.showCreateTicketForm = false;
   }
@@ -93,7 +124,7 @@ export class AppComponent implements OnInit {
 
     this.ticketService.getCustomerTickets().subscribe({
       next: (data) => {
-        this.customerTickets = data;
+        this.customerTickets = this.sortTicketsNewestFirst(data);
       },
       error: () => {
         this.customerTickets = [];
@@ -310,12 +341,14 @@ export class AppComponent implements OnInit {
   }
 
   onTicketUpdated(updated: Ticket): void {
-    this.tickets = this.tickets.map(t => (t.ID === updated.ID ? updated : t));
+    this.tickets = this.sortTicketsNewestFirst(
+      this.tickets.map(t => (t.ID === updated.ID ? updated : t))
+    );
 
     const hasCustomerTicket = this.customerTickets.some(t => t.ID === updated.ID);
     if (hasCustomerTicket) {
-      this.customerTickets = this.customerTickets.map(t =>
-        t.ID === updated.ID ? updated : t
+      this.customerTickets = this.sortTicketsNewestFirst(
+        this.customerTickets.map(t => (t.ID === updated.ID ? updated : t))
       );
       this.openAlert(`ทิกเก็ต #${updated.ID} ของคุณถูกเสร็จสิ้นแล้ว`);
     }

@@ -13,6 +13,7 @@ export interface TicketReply {
 
 export interface Ticket {
   ID?: number;
+  CreatedAt?: string;
   title: string;
   description: string;
   status?: string;

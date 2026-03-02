@@ -30,10 +30,41 @@ export class TicketListComponent implements OnInit {
 
   detailVisible = false;
   detailTicket: Ticket | null = null;
+  
+  previewImage: string | null = null;
 
   activeCategory: 'all' | 'open' | 'in_progress' | 'closed' | 'unassigned' = 'all';
 
   constructor(private ticketService: TicketService) {}
+
+  isImage(path: string): boolean {
+    if (!path) return false;
+    const lower = path.toLowerCase();
+    return lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp');
+  }
+
+  openImage(path: string): void {
+    this.previewImage = path;
+  }
+
+  closeImage(): void {
+    this.previewImage = null;
+  }
+
+  private sortTicketsNewestFirst(list: Ticket[]): Ticket[] {
+    return [...list].sort((a, b) => {
+      const aTime = a.CreatedAt ? Date.parse(a.CreatedAt) : NaN;
+      const bTime = b.CreatedAt ? Date.parse(b.CreatedAt) : NaN;
+
+      if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
+        return bTime - aTime;
+      }
+
+      const aId = a.ID ?? 0;
+      const bId = b.ID ?? 0;
+      return bId - aId;
+    });
+  }
 
   ngOnInit(): void {
     this.syncLoginStateFromStorage();
@@ -100,7 +131,9 @@ export class TicketListComponent implements OnInit {
     if (!this.currentAgentName) {
       return [];
     }
-    return this.tickets.filter(t => t.assigned_to === this.currentAgentName);
+    return this.sortTicketsNewestFirst(
+      this.tickets.filter(t => t.assigned_to === this.currentAgentName)
+    );
   }
 
   countByStatus(status: 'open' | 'in_progress' | 'closed'): number {
@@ -115,17 +148,18 @@ export class TicketListComponent implements OnInit {
   }
 
   getCategoryTickets(): Ticket[] {
+    const sorted = this.sortTicketsNewestFirst(this.tickets);
     switch (this.activeCategory) {
       case 'open':
-        return this.tickets.filter(t => (t.status || '').toLowerCase() === 'open');
+        return sorted.filter(t => (t.status || '').toLowerCase() === 'open');
       case 'in_progress':
-        return this.tickets.filter(t => (t.status || '').toLowerCase() === 'in_progress');
+        return sorted.filter(t => (t.status || '').toLowerCase() === 'in_progress');
       case 'closed':
-        return this.tickets.filter(t => (t.status || '').toLowerCase() === 'closed');
+        return sorted.filter(t => (t.status || '').toLowerCase() === 'closed');
       case 'unassigned':
-        return this.tickets.filter(t => !t.assigned_to);
+        return sorted.filter(t => !t.assigned_to);
       default:
-        return this.tickets;
+        return sorted;
     }
   }
 

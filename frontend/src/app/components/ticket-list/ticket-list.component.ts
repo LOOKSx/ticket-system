@@ -289,7 +289,11 @@ export class TicketListComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error assigning ticket', err);
-        this.openInfo('ไม่สามารถรับทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
+        if (err.error && err.error.error === 'insufficient_permissions') {
+          this.openInfo('คุณไม่มีสิทธิ์รับทิกเก็ตนี้');
+        } else {
+          this.openInfo('ไม่สามารถรับทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
+        }
       }
     });
   }
@@ -322,7 +326,11 @@ export class TicketListComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error releasing ticket', err);
-        this.openInfo('ไม่สามารถส่งคืนทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
+        if (err.error && err.error.error === 'not_ticket_owner') {
+          this.openInfo('คุณไม่ใช่เจ้าของเคสนี้ ไม่สามารถส่งคืนได้');
+        } else {
+          this.openInfo('ไม่สามารถส่งคืนทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
+        }
       }
     });
   }
@@ -347,7 +355,15 @@ export class TicketListComponent implements OnInit {
         },
         error: (err) => {
           console.error('Error completing ticket', err);
-          this.openInfo('ไม่สามารถปิดงานทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
+          if (err.error && err.error.error === 'no_agent_reply_yet') {
+            this.openInfo('กรุณาตอบกลับลูกค้าอย่างน้อย 1 ครั้งก่อนปิดงาน');
+          } else if (err.error && err.error.error === 'not_ticket_owner') {
+            this.openInfo('คุณไม่ใช่เจ้าของเคสนี้ ไม่สามารถปิดงานได้');
+          } else if (err.error && err.error.error === 'ticket_already_closed') {
+            this.openInfo('ทิกเก็ตนี้ถูกปิดไปแล้ว');
+          } else {
+            this.openInfo('ไม่สามารถปิดงานทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
+          }
         }
       });
     });

@@ -1,16 +1,20 @@
 # Go
-*.exe
-*.test
-*.prof
-*.db
-go.work
+backend/*.exe
+backend/*.test
+backend/*.prof
+backend/*.db
+backend/go.work
 
 # Node / Angular
-node_modules/
-.angular/
-coverage/
-npm-debug.log
-yarn-error.log
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/coverage/
+frontend/npm-debug.log
+frontend/yarn-error.log
+
+# Uploads
+backend/uploads/
 
 # Python
 .venv/

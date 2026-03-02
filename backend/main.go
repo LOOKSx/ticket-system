@@ -1040,19 +1040,33 @@ func main() {
 		path := c.Request.URL.Path
 		// Do not handle API routes here
 		if strings.HasPrefix(path, "/api") {
-			return
+			return 
+		}
+		
+		// Find dist folder
+		distPath := "frontend/dist/ticket-frontend/browser" // Default for production
+		if _, err := os.Stat(distPath); os.IsNotExist(err) {
+			// Try parent directory (for local dev)
+			if _, err := os.Stat("../" + distPath); err == nil {
+				distPath = "../" + distPath
+			} else {
+				// Try legacy path
+				legacyPath := "ticket-frontend/dist/ticket-frontend/browser"
+				if _, err := os.Stat(legacyPath); err == nil {
+					distPath = legacyPath
+				}
+			}
 		}
 
 		// Check if file exists in dist folder
-		// Adjust path based on your Angular build output
-		filePath := filepath.Join("ticket-frontend", "dist", "ticket-frontend", "browser", path)
+		filePath := filepath.Join(distPath, path)
 		if _, err := os.Stat(filePath); err == nil {
 			c.File(filePath)
 			return
 		}
-
+		
 		// Fallback to index.html for SPA routes
-		indexPath := filepath.Join("ticket-frontend", "dist", "ticket-frontend", "browser", "index.html")
+		indexPath := filepath.Join(distPath, "index.html")
 		c.File(indexPath)
 	})
 

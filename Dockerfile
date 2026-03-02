@@ -3,11 +3,12 @@ FROM golang:1.24-alpine AS backend-builder
 WORKDIR /app
 
 # Copy Go module files and download dependencies
-COPY go.mod go.sum ./
+# Note: Context is project root, files are in backend/
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
 # Copy the source code
-COPY . .
+COPY backend/ .
 
 # Build the Go application
 RUN go build -o server main.go models.go
@@ -23,7 +24,8 @@ RUN apk --no-cache add ca-certificates
 COPY --from=backend-builder /app/server .
 
 # Copy the frontend build artifacts from LOCAL machine
-COPY ticket-frontend/dist/ticket-frontend/browser ./ticket-frontend/dist/ticket-frontend/browser
+# Note: Context is project root, files are in frontend/dist/...
+COPY frontend/dist/ticket-frontend/browser ./frontend/dist/ticket-frontend/browser
 
 # Create uploads directory
 RUN mkdir -p uploads

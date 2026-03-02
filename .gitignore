@@ -7,7 +7,7 @@ backend/go.work
 
 # Node / Angular
 frontend/node_modules/
-frontend/dist/
+# frontend/dist/  <-- Uncommented to allow pushing build artifacts
 frontend/.angular/
 frontend/coverage/
 frontend/npm-debug.log

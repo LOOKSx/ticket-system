@@ -86,6 +86,7 @@ func main() {
 			"http://localhost:5173",
 			"http://127.0.0.1:5173",
 			"http://192.168.50.181:4200",
+			"http://192.168.50.180:4200",
 		},
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
@@ -133,7 +134,7 @@ func main() {
 				return
 			}
 
-			logActivity(user.ID, user.Name, user.Role, "LOGIN", "Admin Login Success", c.ClientIP())
+			logActivity(user.ID, user.Name, user.Role, "LOGIN", "ผู้ดูแลระบบเข้าสู่ระบบสำเร็จ", c.ClientIP())
 
 			c.JSON(http.StatusOK, gin.H{
 				"token": tokenString,
@@ -293,7 +294,7 @@ func main() {
 			fmt.Println("Login SUCCESS: Token returned.")
 			fmt.Println("=== LOGIN ATTEMPT END ===")
 
-			logActivity(user.ID, user.Name, user.Role, "LOGIN", "Customer Login Success", c.ClientIP())
+			logActivity(user.ID, user.Name, user.Role, "LOGIN", "ลูกค้าเข้าสู่ระบบสำเร็จ", c.ClientIP())
 
 			c.JSON(http.StatusOK, gin.H{
 				"token": tokenString,
@@ -630,7 +631,7 @@ func main() {
 
 			DB.Preload("Customer").First(&ticket, ticket.ID)
 
-			logActivity(ticket.CustomerID, ticket.Customer.Name, "customer", "CREATE_TICKET", fmt.Sprintf("Created Ticket #%d: %s", ticket.ID, ticket.Title), c.ClientIP())
+			logActivity(ticket.CustomerID, ticket.Customer.Name, "customer", "CREATE_TICKET", fmt.Sprintf("สร้างทิกเก็ต #%d: %s", ticket.ID, ticket.Title), c.ClientIP())
 
 			c.JSON(http.StatusCreated, ticket)
 		})
@@ -728,7 +729,7 @@ func main() {
 				userID = v
 			}
 
-			logActivity(userID, authorName, role, "REPLY_TICKET", fmt.Sprintf("Replied to Ticket #%d", ticket.ID), c.ClientIP())
+			logActivity(userID, authorName, role, "REPLY_TICKET", fmt.Sprintf("ตอบกลับทิกเก็ต #%d", ticket.ID), c.ClientIP())
 
 			c.JSON(http.StatusCreated, reply)
 		})
@@ -857,7 +858,7 @@ func main() {
 
 			DB.Preload("Customer").First(&ticket, ticket.ID)
 
-			logActivity(agentID, agentName, role, "ASSIGN_TICKET", fmt.Sprintf("Assigned Ticket #%d to self", ticket.ID), c.ClientIP())
+			logActivity(agentID, agentName, role, "ASSIGN_TICKET", fmt.Sprintf("รับเคส #%d", ticket.ID), c.ClientIP())
 
 			c.JSON(http.StatusOK, ticket)
 		})
@@ -1028,7 +1029,7 @@ func main() {
 
 			DB.Preload("Customer").First(&ticket, ticket.ID)
 
-			logActivity(agentID, agentName, role, "COMPLETE_TICKET", fmt.Sprintf("Completed Ticket #%d", ticket.ID), c.ClientIP())
+			logActivity(agentID, agentName, role, "COMPLETE_TICKET", fmt.Sprintf("ปิดงานทิกเก็ต #%d", ticket.ID), c.ClientIP())
 
 			c.JSON(http.StatusOK, ticket)
 		})

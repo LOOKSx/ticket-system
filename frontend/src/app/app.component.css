@@ -100,10 +100,10 @@
   top: 84px;
   right: 24px;
   width: calc(100% - 48px);
-  max-width: 720px;
+  max-width: 520px;
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
-  padding: 32px;
+  padding: 28px;
   box-shadow: var(--shadow-xl);
   border: 1px solid var(--border);
   animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -145,11 +145,61 @@
   transform: translateX(-50%);
 }
 
+.auth-panel-grid.auth-panel-single {
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.auth-panel-grid.auth-panel-single::after {
+  display: none;
+}
+
+.auth-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auth-panel-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .auth-panel-column h3 {
   margin: 0 0 20px;
   font-size: 18px;
   font-weight: 600;
   color: var(--text-main);
+}
+
+@media (max-width: 768px) {
+  .header-auth-panel {
+    top: 72px; /* Match header height exactly */
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: 100%;
+    height: auto !important; /* Fit content height */
+    max-height: calc(100vh - 90px); /* Prevent overflow */
+    margin: 0;
+    padding: 24px 20px;
+    border-radius: 0 0 24px 24px !important; /* Rounded bottom */
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+    border: none !important;
+    overflow-y: auto; /* Allow scrolling if content is tall */
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 1024px) {
+  .header-auth-panel {
+    max-width: 560px;
+    padding: 32px;
+  }
 }
 
 .form-field {
@@ -385,4 +435,25 @@
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
   }
+}
+
+/* Priority Badges */
+.priority-high {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+.priority-medium {
+  background-color: #ffedd5 !important;
+  color: #9a3412 !important;
+}
+
+.priority-low {
+  background-color: #dcfce7 !important;
+  color: #166534 !important;
+}
+
+.priority-unknown {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
 }

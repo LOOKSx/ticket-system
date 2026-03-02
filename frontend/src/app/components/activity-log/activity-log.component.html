@@ -1,12 +1,12 @@
 <div class="container mx-auto p-4">
-  <h2 class="text-2xl font-bold mb-4">Activity Logs (Audit Trail)</h2>
+  <h2 class="text-2xl font-bold mb-4">บันทึกกิจกรรม (Audit Trail)</h2>
 
   <div *ngIf="loading" class="text-center py-4">
-    <p>Loading logs...</p>
+    <p>กำลังโหลดข้อมูล...</p>
   </div>
 
   <div *ngIf="!loading && logs.length === 0" class="text-center py-4 text-gray-500">
-    <p>No activity logs found.</p>
+    <p>ไม่พบประวัติกิจกรรม</p>
   </div>
 
   <div *ngIf="!loading && logs.length > 0" class="overflow-x-auto bg-white shadow-md rounded-lg">
@@ -14,22 +14,22 @@
       <thead>
         <tr>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            Time
+            เวลา
           </th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            User
+            ผู้ใช้งาน
           </th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            Role
+            บทบาท
           </th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            Action
+            การกระทำ
           </th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            Details
+            รายละเอียด
           </th>
           <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-            IP Address
+            หมายเลข IP
           </th>
         </tr>
       </thead>
@@ -52,12 +52,12 @@
                   [ngClass]="{'text-green-900': log.role === 'Admin', 'text-blue-900': log.role !== 'Admin'}">
               <span aria-hidden="true" class="absolute inset-0 opacity-50 rounded-full"
                     [ngClass]="{'bg-green-200': log.role === 'Admin', 'bg-blue-200': log.role !== 'Admin'}"></span>
-              <span class="relative">{{ log.role }}</span>
+              <span class="relative">{{ getThaiRole(log.role) }}</span>
             </span>
           </td>
           <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-               {{ log.action }}
+               {{ getThaiAction(log.action) }}
              </span>
           </td>
           <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">

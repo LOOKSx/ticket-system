@@ -26,12 +26,15 @@ export class AppComponent implements OnInit {
   authRole: 'customer' | 'Admin' | null = null;
 
   showCustomerAuthPanel = false;
+  authPanelView: 'login' | 'register' = 'login';
   customerLoginEmail = '';
   customerLoginPassword = '';
 
   customerRegisterName = '';
   customerRegisterEmail = '';
   customerRegisterPassword = '';
+
+  showCreateTicketForm = false;
 
   customerAuthMessage = '';
 
@@ -78,6 +81,7 @@ export class AppComponent implements OnInit {
   onTicketCreated(ticket: Ticket): void {
     this.tickets.push(ticket);
     this.loadCustomerTickets();
+    this.showCreateTicketForm = false;
   }
 
   loadCustomerTickets(): void {
@@ -98,7 +102,22 @@ export class AppComponent implements OnInit {
   }
 
   toggleCustomerAuthPanel(): void {
-    this.showCustomerAuthPanel = !this.showCustomerAuthPanel;
+    const nextVisible = !this.showCustomerAuthPanel;
+    this.showCustomerAuthPanel = nextVisible;
+    this.customerAuthMessage = '';
+    if (nextVisible) {
+      this.authPanelView = 'login';
+    }
+  }
+
+  openLoginView(): void {
+    this.authPanelView = 'login';
+    this.customerAuthMessage = '';
+  }
+
+  openRegisterView(): void {
+    this.authPanelView = 'register';
+    this.customerAuthMessage = '';
   }
 
   loginCustomer(): void {

@@ -102,6 +102,8 @@
     </div>
 
     <div class="ticket-table" *ngIf="tickets.length > 0">
+      <!-- Header Row Hidden for Card View -->
+      <!--
       <div class="ticket-header-row">
         <div class="ticket-col-status">สถานะ</div>
         <div class="ticket-col-priority">ความเร่งด่วน</div>
@@ -110,94 +112,80 @@
         <div class="ticket-col-assignee">ผู้รับผิดชอบ</div>
         <div class="ticket-col-actions"></div>
       </div>
+      -->
 
       <ng-container *ngFor="let t of getCategoryTickets()">
-        <div class="ticket-card-wrapper">
-          <div class="ticket-row">
-            <div class="ticket-col-status">
-            <span class="badge" [ngClass]="'status-' + (t.status || 'unknown')">
-              {{ getStatusLabel(t.status) }}
-            </span>
+        <div class="ticket-card-wrapper" style="border-left: 4px solid #4f46e5; border-radius: 4px; overflow: hidden; background: white; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 100%;">
+          <div class="ticket-row" style="display: flex; flex-direction: column; gap: 8px; cursor: pointer; padding: 12px 16px; width: 100%; box-sizing: border-box;" (click)="toggleReplies(t)">
+            <div class="ticket-item-header">
+              <div class="ticket-item-content">
+                <div class="ticket-item-title">
+                    <span class="ticket-id-badge">#{{ t.ID }}</span>
+                    {{ t.title }}
+                </div>
+                <div class="ticket-customer-info">
+                  ลูกค้า: {{ t.customer?.name || 'ไม่ระบุ' }}
+                </div>
+              </div>
+              <span class="badge ticket-status-badge" [ngClass]="'status-' + (t.status || 'unknown')">{{ getStatusLabel(t.status) }}</span>
+            </div>
+            <div class="ticket-priority-row">
+              <span class="badge" [ngClass]="'priority-' + (t.priority || 'unknown')" style="border-radius: 9999px; padding: 4px 12px; font-size: 0.75em;">ความเร่งด่วน: {{ getPriorityLabel(t.priority) }}</span>
+            </div>
           </div>
-          <div class="ticket-col-priority">
-            <span class="badge" [ngClass]="'priority-' + (t.priority || 'unknown')">
-              {{ getPriorityLabel(t.priority) }}
-            </span>
-          </div>
-          <div class="ticket-col-customer">
-            {{ t.customer?.name || 'ไม่ระบุ' }}
-          </div>
-          <div class="ticket-col-main" (click)="openDetail(t)">
-            <span class="ticket-title-inline">
-              #{{ t.ID }} {{ t.title }}
-            </span>
-            <span class="ticket-snippet">
-              – {{ t.description }}
-            </span>
-            <span class="ticket-contact-inline">
-              เบอร์ติดต่อ: {{ t.phone_number || '-' }}
-            </span>
-          </div>
-          <div class="ticket-col-assignee">
-            <span>
-              {{ t.assigned_to || 'ยังไม่มีผู้รับเคส' }}
-            </span>
-          </div>
-          <div class="ticket-col-actions">
-            <!-- Unassigned: Show Receive button -->
-            <button
-              type="button"
-              class="primary-button"
-              *ngIf="isLoggedIn && !t.assigned_to"
-              (click)="assignTicket(t)"
-            >
-              รับเคส
-            </button>
 
-            <!-- Assigned to me: Show Actions -->
-            <ng-container *ngIf="isLoggedIn && t.assigned_to === currentAgentName">
-              <button
-                type="button"
-                class="secondary-button"
-                (click)="toggleReplies(t)"
-              >
-                ตอบกลับ
-              </button>
-              
-              <button
-                type="button"
-                class="secondary-button"
-                *ngIf="t.status !== 'closed'"
-                (click)="completeTicket(t)"
-              >
-                ปิดงาน
-              </button>
-
-              <button
-                type="button"
-                class="secondary-button danger"
-                (click)="releaseTicket(t)"
-                title="ส่งคืนเคส"
-              >
-                ส่งคืน
-              </button>
-            </ng-container>
-
-            <!-- Always show Delete for logged in users -->
-            <button
-              type="button"
-              class="secondary-button danger"
-              *ngIf="isLoggedIn"
-              (click)="deleteTicket(t)"
-              title="ลบทิกเก็ต"
-            >
-              ลบ
-            </button>
-          </div>
-        </div>
-
-        <div class="ticket-detail-row" *ngIf="t.showReplies || t.attachment_path">
+        <div class="ticket-detail-row" *ngIf="t.showReplies">
           <div class="ticket-detail-cell">
+            <div class="ticket-expanded-details">
+               <div style="margin-bottom: 0.5rem;"><strong>รายละเอียด:</strong> {{ t.description }}</div>
+               <div style="margin-bottom: 0.5rem;"><strong>เบอร์ติดต่อ:</strong> {{ t.phone_number || '-' }}</div>
+               <div style="margin-bottom: 0.5rem;"><strong>ลูกค้า:</strong> {{ t.customer?.name || 'ไม่ระบุ' }}</div>
+               <div style="margin-bottom: 0.5rem;"><strong>ผู้รับผิดชอบ:</strong> {{ t.assigned_to || 'ยังไม่มีผู้รับเคส' }}</div>
+               
+               <div class="expanded-actions" style="margin-top: 1rem; display: flex; gap: 8px; flex-wrap: wrap;">
+                  <!-- Unassigned: Show Receive button -->
+                  <button
+                    type="button"
+                    class="primary-button"
+                    *ngIf="isLoggedIn && !t.assigned_to"
+                    (click)="assignTicket(t)"
+                  >
+                    รับเคส
+                  </button>
+
+                  <!-- Assigned to me: Show Actions -->
+                  <ng-container *ngIf="isLoggedIn && t.assigned_to === currentAgentName">
+                    <!-- Reply button is redundant as the form is below, but kept for consistency if needed or removed to reduce clutter. User said "bottom comes up", so the reply form is enough. -->
+                    
+                    <button
+                      type="button"
+                      class="secondary-button"
+                      *ngIf="t.status !== 'closed'"
+                      (click)="completeTicket(t)"
+                    >
+                      ปิดงาน
+                    </button>
+
+                    <button
+                      type="button"
+                      class="secondary-button danger"
+                      (click)="releaseTicket(t)"
+                      title="ส่งคืนเคส"
+                    >
+                      ส่งคืน
+                    </button>
+
+                    <button
+                      type="button"
+                      class="secondary-button danger"
+                      (click)="deleteTicket(t)"
+                      title="ลบทิกเก็ต"
+                    >
+                      ลบทิกเก็ต
+                    </button>
+                  </ng-container>
+               </div>
+            </div>
             <div class="ticket-history" *ngIf="t.showReplies">
               <div *ngIf="t.replies && t.replies.length; else noHistory">
                 <div class="history-item" *ngFor="let r of t.replies" [class.is-admin]="isAdmin(r.author_role)">
@@ -223,7 +211,7 @@
                 </div>
               </ng-template>
 
-              <div class="history-reply-form" *ngIf="isLoggedIn">
+              <div class="history-reply-form" *ngIf="isLoggedIn && t.assigned_to === currentAgentName">
                 <textarea
                   [(ngModel)]="t.newReplyMessage"
                   rows="2"
@@ -280,10 +268,10 @@
       </div>
 
       <div class="detail-meta">
-        <span class="badge" [ngClass]="'status-' + (detailTicket.status || 'unknown')">
+        <span class="badge" [ngClass]="'status-' + (detailTicket.status || 'unknown')" style="background: #dbeafe; color: #1e40af; border-radius: 9999px; padding: 4px 12px; font-size: 0.75em;">
           {{ getStatusLabel(detailTicket.status) }}
         </span>
-        <span class="badge" [ngClass]="'priority-' + (detailTicket.priority || 'unknown')">
+        <span class="badge" [ngClass]="'priority-' + (detailTicket.priority || 'unknown')" style="border-radius: 9999px; padding: 4px 12px; font-size: 0.75em;">
           ความเร่งด่วน: {{ getPriorityLabel(detailTicket.priority) }}
         </span>
       </div>

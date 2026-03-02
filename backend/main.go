@@ -46,13 +46,25 @@ func ConnectDatabase() {
 		log.Fatal("Failed to connect to database!", err)
 	}
 
-	err = database.AutoMigrate(&User{}, &Ticket{}, &TicketReply{})
+	err = database.AutoMigrate(&User{}, &Ticket{}, &TicketReply{}, &ActivityLog{})
 	if err != nil {
 		log.Fatal("Failed to migrate database!", err)
 	}
 
 	DB = database
 
+}
+
+func logActivity(userID uint, userName, role, action, details, ip string) {
+	log := ActivityLog{
+		UserID:    userID,
+		UserName:  userName,
+		Role:      role,
+		Action:    action,
+		Details:   details,
+		IPAddress: ip,
+	}
+	DB.Create(&log)
 }
 
 func main() {
@@ -120,6 +132,8 @@ func main() {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_generate_token"})
 				return
 			}
+
+			logActivity(user.ID, user.Name, user.Role, "LOGIN", "Admin Login Success", c.ClientIP())
 
 			c.JSON(http.StatusOK, gin.H{
 				"token": tokenString,
@@ -278,6 +292,8 @@ func main() {
 
 			fmt.Println("Login SUCCESS: Token returned.")
 			fmt.Println("=== LOGIN ATTEMPT END ===")
+
+			logActivity(user.ID, user.Name, user.Role, "LOGIN", "Customer Login Success", c.ClientIP())
 
 			c.JSON(http.StatusOK, gin.H{
 				"token": tokenString,
@@ -614,6 +630,8 @@ func main() {
 
 			DB.Preload("Customer").First(&ticket, ticket.ID)
 
+			logActivity(ticket.CustomerID, ticket.Customer.Name, "customer", "CREATE_TICKET", fmt.Sprintf("Created Ticket #%d: %s", ticket.ID, ticket.Title), c.ClientIP())
+
 			c.JSON(http.StatusCreated, ticket)
 		})
 
@@ -698,6 +716,19 @@ func main() {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_create_reply"})
 				return
 			}
+
+			sub, _ := claims["sub"]
+			var userID uint
+			switch v := sub.(type) {
+			case float64:
+				userID = uint(v)
+			case int64:
+				userID = uint(v)
+			case uint:
+				userID = v
+			}
+
+			logActivity(userID, authorName, role, "REPLY_TICKET", fmt.Sprintf("Replied to Ticket #%d", ticket.ID), c.ClientIP())
 
 			c.JSON(http.StatusCreated, reply)
 		})
@@ -826,6 +857,8 @@ func main() {
 
 			DB.Preload("Customer").First(&ticket, ticket.ID)
 
+			logActivity(agentID, agentName, role, "ASSIGN_TICKET", fmt.Sprintf("Assigned Ticket #%d to self", ticket.ID), c.ClientIP())
+
 			c.JSON(http.StatusOK, ticket)
 		})
 
@@ -898,6 +931,8 @@ func main() {
 			}
 
 			DB.Preload("Customer").First(&ticket, ticket.ID)
+
+			logActivity(agentID, agentName, role, "RELEASE_TICKET", fmt.Sprintf("Released Ticket #%d", ticket.ID), c.ClientIP())
 
 			c.JSON(http.StatusOK, ticket)
 		})
@@ -993,7 +1028,50 @@ func main() {
 
 			DB.Preload("Customer").First(&ticket, ticket.ID)
 
+			logActivity(agentID, agentName, role, "COMPLETE_TICKET", fmt.Sprintf("Completed Ticket #%d", ticket.ID), c.ClientIP())
+
 			c.JSON(http.StatusOK, ticket)
+		})
+
+		api.GET("/admin/logs", func(c *gin.Context) {
+			authHeader := c.GetHeader("Authorization")
+			if !strings.HasPrefix(authHeader, "Bearer ") {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "missing_or_invalid_token"})
+				return
+			}
+
+			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+
+			parsedToken, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method")
+				}
+				return jwtSecret, nil
+			})
+			if err != nil || !parsedToken.Valid {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			claims, ok := parsedToken.Claims.(jwt.MapClaims)
+			if !ok {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			role, _ := claims["role"].(string)
+			if role != "Admin" {
+				c.JSON(http.StatusForbidden, gin.H{"error": "insufficient_permissions"})
+				return
+			}
+
+			var logs []ActivityLog
+			if err := DB.Order("created_at desc").Limit(100).Find(&logs).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_load_logs"})
+				return
+			}
+
+			c.JSON(http.StatusOK, logs)
 		})
 	}
 

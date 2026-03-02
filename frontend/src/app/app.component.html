@@ -27,6 +27,14 @@
             </span>
             <button
               type="button"
+              class="header-auth-button"
+              (click)="showLogs = !showLogs"
+              style="margin-right: 1rem;"
+            >
+              {{ showLogs ? 'ปิดบันทึก' : 'ดูบันทึก' }}
+            </button>
+            <button
+              type="button"
               class="header-auth-button secondary"
               (click)="logoutAgent()"
             >
@@ -304,12 +312,15 @@
       </section>
     </div>
 
-    <app-ticket-list
-      *ngIf="authRole === 'Admin'"
-      [tickets]="tickets"
-      (resetRequested)="onAgentReset()"
-      (ticketUpdated)="onTicketUpdated($event)"
-    ></app-ticket-list>
+    <ng-container *ngIf="authRole === 'Admin'">
+      <app-activity-log *ngIf="showLogs"></app-activity-log>
+      <app-ticket-list
+        *ngIf="!showLogs"
+        [tickets]="tickets"
+        (resetRequested)="onAgentReset()"
+        (ticketUpdated)="onTicketUpdated($event)"
+      ></app-ticket-list>
+    </ng-container>
   </main>
 
   <div

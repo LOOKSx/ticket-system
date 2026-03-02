@@ -1,0 +1,175 @@
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+h2 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    color: #111827;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.py-4 {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.text-gray-500 {
+    color: #6b7280;
+}
+
+.overflow-x-auto {
+    overflow-x: auto;
+}
+
+.bg-white {
+    background-color: white;
+}
+
+.shadow-md {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.rounded-lg {
+    border-radius: 0.5rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    padding: 0.75rem 1.25rem;
+    border-bottom-width: 2px;
+    border-color: #e5e7eb;
+    background-color: #f3f4f6;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4b5563;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+td {
+    padding: 1.25rem 1.25rem;
+    border-bottom-width: 1px;
+    border-color: #e5e7eb;
+    background-color: white;
+    font-size: 0.875rem;
+    vertical-align: middle;
+}
+
+.text-sm {
+    font-size: 0.875rem;
+}
+
+.text-gray-900 {
+    color: #111827;
+}
+
+.whitespace-no-wrap {
+    white-space: nowrap;
+}
+
+.flex {
+    display: flex;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.ml-3 {
+    margin-left: 0.75rem;
+}
+
+.relative {
+    position: relative;
+}
+
+.inline-block {
+    display: inline-block;
+}
+
+.px-3 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}
+
+.py-1 {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+.font-semibold {
+    font-weight: 600;
+}
+
+.leading-tight {
+    line-height: 1.25;
+}
+
+.inset-0 {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+}
+
+.absolute {
+    position: absolute;
+}
+
+.opacity-50 {
+    opacity: 0.5;
+}
+
+.rounded-full {
+    border-radius: 9999px;
+}
+
+/* Badge colors */
+.bg-green-200 {
+    background-color: #a7f3d0;
+}
+
+.text-green-900 {
+    color: #064e3b;
+}
+
+.bg-blue-200 {
+    background-color: #bfdbfe;
+}
+
+.text-blue-900 {
+    color: #1e3a8a;
+}
+
+.bg-gray-100 {
+    background-color: #f3f4f6;
+}
+
+.text-gray-800 {
+    color: #1f2937;
+}
+
+.px-2 {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+.text-xs {
+    font-size: 0.75rem;
+}
+
+.leading-5 {
+    line-height: 1.25rem;
+}

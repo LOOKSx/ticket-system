@@ -37,3 +37,13 @@ type TicketReply struct {
 	AuthorRole string `json:"author_role"`
 	Message    string `json:"message"`
 }
+
+type ActivityLog struct {
+	gorm.Model
+	UserID    uint   `json:"user_id"`
+	UserName  string `json:"user_name"`
+	Role      string `json:"role"`
+	Action    string `json:"action"`
+	Details   string `json:"details"`
+	IPAddress string `json:"ip_address"`
+}

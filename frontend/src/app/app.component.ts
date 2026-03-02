@@ -4,17 +4,20 @@ import { FormsModule } from '@angular/forms';
 import { TicketService, Ticket, TicketReply } from './services/ticket.service';
 import { TicketFormComponent } from './components/ticket-form/ticket-form.component';
 import { TicketListComponent } from './components/ticket-list/ticket-list.component';
+import { ActivityLogComponent } from './components/activity-log/activity-log.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, TicketFormComponent, TicketListComponent],
+  imports: [CommonModule, FormsModule, TicketFormComponent, TicketListComponent, ActivityLogComponent],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css', './app-ticket-history.css']
 })
 export class AppComponent implements OnInit {
   tickets: Ticket[] = [];
   customerTickets: Ticket[] = [];
+
+  showLogs = false;
 
   customerIsLoggedIn = false;
   customerName = '';

@@ -34,6 +34,17 @@ export interface AgentUser {
   email: string;
 }
 
+export interface ActivityLog {
+  ID: number;
+  user_id: number;
+  user_name: string;
+  role: string;
+  action: string;
+  details: string;
+  ip_address: string;
+  CreatedAt: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -145,6 +156,12 @@ export class TicketService {
 
   getAgents(): Observable<AgentUser[]> {
     return this.http.get<AgentUser[]>(this.agentsUrl);
+  }
+
+  getLogs(): Observable<ActivityLog[]> {
+    const token = localStorage.getItem('agentToken');
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.get<ActivityLog[]>('/api/admin/logs', { headers });
   }
 
   clearAllTickets(): Observable<void> {

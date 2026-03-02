@@ -1,0 +1,73 @@
+<div class="container mx-auto p-4">
+  <h2 class="text-2xl font-bold mb-4">Activity Logs (Audit Trail)</h2>
+
+  <div *ngIf="loading" class="text-center py-4">
+    <p>Loading logs...</p>
+  </div>
+
+  <div *ngIf="!loading && logs.length === 0" class="text-center py-4 text-gray-500">
+    <p>No activity logs found.</p>
+  </div>
+
+  <div *ngIf="!loading && logs.length > 0" class="overflow-x-auto bg-white shadow-md rounded-lg">
+    <table class="min-w-full leading-normal">
+      <thead>
+        <tr>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            Time
+          </th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            User
+          </th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            Role
+          </th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            Action
+          </th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            Details
+          </th>
+          <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+            IP Address
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let log of logs">
+          <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+            {{ log.CreatedAt | date:'medium' }}
+          </td>
+          <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+            <div class="flex items-center">
+              <div class="ml-3">
+                <p class="text-gray-900 whitespace-no-wrap">
+                  {{ log.user_name }}
+                </p>
+              </div>
+            </div>
+          </td>
+          <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+            <span class="relative inline-block px-3 py-1 font-semibold leading-tight"
+                  [ngClass]="{'text-green-900': log.role === 'Admin', 'text-blue-900': log.role !== 'Admin'}">
+              <span aria-hidden="true" class="absolute inset-0 opacity-50 rounded-full"
+                    [ngClass]="{'bg-green-200': log.role === 'Admin', 'bg-blue-200': log.role !== 'Admin'}"></span>
+              <span class="relative">{{ log.role }}</span>
+            </span>
+          </td>
+          <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+               {{ log.action }}
+             </span>
+          </td>
+          <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+            <p class="text-gray-900 whitespace-no-wrap">{{ log.details }}</p>
+          </td>
+          <td class="px-5 py-5 border-b border-gray-200 bg-white text-sm">
+            <p class="text-gray-900 whitespace-no-wrap">{{ log.ip_address }}</p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

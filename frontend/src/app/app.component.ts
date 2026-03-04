@@ -1,5 +1,6 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { TicketService, Ticket, TicketReply } from './services/ticket.service';
 import { TicketFormComponent } from './components/ticket-form/ticket-form.component';
@@ -52,7 +53,17 @@ export class AppComponent implements OnInit {
   isImage(path: string): boolean {
     if (!path) return false;
     const lower = path.toLowerCase();
-    return lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp');
+    return lower.endsWith('.jpg') || 
+           lower.endsWith('.jpeg') || 
+           lower.endsWith('.png') || 
+           lower.endsWith('.gif') || 
+           lower.endsWith('.webp') || 
+           lower.endsWith('.bmp') || 
+           lower.endsWith('.svg') || 
+           lower.endsWith('.ico') || 
+           lower.endsWith('.tif') || 
+           lower.endsWith('.tiff') || 
+           lower.endsWith('.heic');
   }
 
   openImage(path: string): void {
@@ -154,17 +165,16 @@ export class AppComponent implements OnInit {
   loginCustomer(): void {
     this.customerAuthMessage = '';
     const email = this.customerLoginEmail.trim();
-    const password = this.customerLoginPassword.trim();
-    if (!email || !password) {
+    const password = this.customerLoginPassword;
+    if (!email || !password.trim()) {
       this.customerAuthMessage = 'กรุณากรอกอีเมลและรหัสผ่านสำหรับเข้าสู่ระบบ';
       return;
     }
 
     this.ticketService.loginCustomer(email, password).subscribe({
       next: (res) => {
-        // Handle role with potential whitespace or case issues
-        const role = (res.role || '').trim();
-        if (role === 'Admin') {
+        const role = (res.role || '').trim().toLowerCase();
+        if (role === 'admin') {
           localStorage.setItem('agentToken', res.token);
           localStorage.setItem('agentName', res.name);
           this.agentName = res.name;
@@ -174,7 +184,7 @@ export class AppComponent implements OnInit {
             this.ticketList.refreshLoginFromStorage();
           }
           this.loadTickets();
-        } else {
+        } else if (role === 'customer') {
           localStorage.setItem('customerToken', res.token);
           localStorage.setItem('customerName', res.name);
           this.customerIsLoggedIn = true;
@@ -182,12 +192,27 @@ export class AppComponent implements OnInit {
           this.authRole = 'customer';
           this.customerAuthMessage = 'เข้าสู่ระบบลูกค้าเรียบร้อยแล้ว';
           this.loadCustomerTickets();
+        } else {
+          this.customerAuthMessage = 'ไม่สามารถเข้าสู่ระบบได้ เนื่องจากสิทธิ์ผู้ใช้ไม่ถูกต้อง';
+          return;
         }
         this.customerLoginPassword = '';
         this.showCustomerAuthPanel = false;
       },
-      error: () => {
-        this.customerAuthMessage = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+      error: (err: HttpErrorResponse) => {
+        if (err.status === 0) {
+          this.customerAuthMessage = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบว่า Backend ทำงานอยู่ที่พอร์ต 8080';
+          return;
+        }
+        if (err.status === 401) {
+          this.customerAuthMessage = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+          return;
+        }
+        if (err.status === 403) {
+          this.customerAuthMessage = 'บัญชีนี้ยังไม่มีสิทธิ์เข้าใช้งานระบบ';
+          return;
+        }
+        this.customerAuthMessage = 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่';
       }
     });
   }
@@ -196,9 +221,9 @@ export class AppComponent implements OnInit {
     this.customerAuthMessage = '';
     const name = this.customerRegisterName.trim();
     const email = this.customerRegisterEmail.trim();
-    const password = this.customerRegisterPassword.trim();
+    const password = this.customerRegisterPassword;
 
-    if (!name || !email || !password) {
+    if (!name || !email || !password.trim()) {
       this.customerAuthMessage = 'กรุณากรอกชื่อ อีเมล และรหัสผ่านให้ครบถ้วน';
       return;
     }

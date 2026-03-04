@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TicketService, Ticket, TicketReply, AgentUser } from '../../services/ticket.service';
@@ -30,8 +30,17 @@ export class TicketListComponent implements OnInit {
 
   detailVisible = false;
   detailTicket: Ticket | null = null;
-  
+
   previewImage: string | null = null;
+  previewZoom = 1;
+  previewImageLoading = false;
+  previewImageError = false;
+
+  filterHasAttachment = false;
+
+  private attachmentImageState: Record<string, { loaded: boolean; error: boolean }> = {};
+  private attachmentMeta: Record<string, { fileName: string; fileSizeLabel: string }> = {};
+  private assigningTicketIds = new Set<number>();
 
   activeCategory: 'all' | 'open' | 'in_progress' | 'closed' | 'unassigned' = 'all';
 
@@ -40,15 +49,225 @@ export class TicketListComponent implements OnInit {
   isImage(path: string): boolean {
     if (!path) return false;
     const lower = path.toLowerCase();
-    return lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.gif') || lower.endsWith('.webp');
+    return lower.endsWith('.jpg') || 
+           lower.endsWith('.jpeg') || 
+           lower.endsWith('.png') || 
+           lower.endsWith('.gif') || 
+           lower.endsWith('.webp') || 
+           lower.endsWith('.bmp') || 
+           lower.endsWith('.svg') || 
+           lower.endsWith('.ico') || 
+           lower.endsWith('.tif') || 
+           lower.endsWith('.tiff') || 
+           lower.endsWith('.heic');
   }
 
   openImage(path: string): void {
     this.previewImage = path;
+    this.previewZoom = 1;
+    this.previewImageLoading = true;
+    this.previewImageError = false;
+    document.body.style.overflow = 'hidden';
   }
 
   closeImage(): void {
     this.previewImage = null;
+    this.previewImageLoading = false;
+    this.previewImageError = false;
+    this.previewZoom = 1;
+    document.body.style.overflow = '';
+  }
+
+  zoomIn(): void {
+    this.previewZoom = Math.min(3, this.previewZoom + 0.25);
+  }
+
+  zoomOut(): void {
+    this.previewZoom = Math.max(0.5, this.previewZoom - 0.25);
+  }
+
+  resetZoom(): void {
+    this.previewZoom = 1;
+  }
+
+  downloadPreviewImage(): void {
+    if (!this.previewImage) {
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = this.previewImage;
+    link.download = this.getAttachmentFileName(this.previewImage);
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
+  }
+
+  onPreviewImageLoad(): void {
+    this.previewImageLoading = false;
+    this.previewImageError = false;
+  }
+
+  onPreviewImageError(): void {
+    this.previewImageLoading = false;
+    this.previewImageError = true;
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  handlePreviewKeydown(event: KeyboardEvent): void {
+    if (!this.previewImage) {
+      return;
+    }
+    if (event.key === 'Escape') {
+      this.closeImage();
+      return;
+    }
+    if (event.key === '+' || event.key === '=') {
+      event.preventDefault();
+      this.zoomIn();
+      return;
+    }
+    if (event.key === '-') {
+      event.preventDefault();
+      this.zoomOut();
+      return;
+    }
+    if (event.key === '0') {
+      event.preventDefault();
+      this.resetZoom();
+    }
+  }
+
+  private ensureAttachmentState(path: string): void {
+    if (!this.attachmentImageState[path]) {
+      this.attachmentImageState[path] = { loaded: false, error: false };
+    }
+    if (!this.attachmentMeta[path]) {
+      this.attachmentMeta[path] = {
+        fileName: this.getAttachmentFileName(path),
+        fileSizeLabel: 'กำลังโหลดขนาดไฟล์...'
+      };
+      this.loadAttachmentMeta(path);
+    }
+  }
+
+  onAttachmentLoad(path: string): void {
+    this.ensureAttachmentState(path);
+    this.attachmentImageState[path].loaded = true;
+    this.attachmentImageState[path].error = false;
+  }
+
+  onAttachmentError(path: string): void {
+    this.ensureAttachmentState(path);
+    this.attachmentImageState[path].loaded = false;
+    this.attachmentImageState[path].error = true;
+    this.attachmentMeta[path] = {
+      fileName: this.getAttachmentFileName(path),
+      fileSizeLabel: 'ไม่ทราบขนาดไฟล์'
+    };
+  }
+
+  isAttachmentLoading(path?: string): boolean {
+    if (!path) {
+      return false;
+    }
+    this.ensureAttachmentState(path);
+    const state = this.attachmentImageState[path];
+    return !state.loaded && !state.error;
+  }
+
+  hasAttachmentError(path?: string): boolean {
+    if (!path) {
+      return false;
+    }
+    this.ensureAttachmentState(path);
+    return this.attachmentImageState[path].error;
+  }
+
+  getAttachmentFileName(path: string): string {
+    const withoutQuery = path.split('?')[0];
+    const parts = withoutQuery.split('/');
+    const rawName = parts[parts.length - 1] || 'ไฟล์แนบ';
+    try {
+      return decodeURIComponent(rawName);
+    } catch {
+      return rawName;
+    }
+  }
+
+  getAttachmentSizeLabel(path?: string): string {
+    if (!path) {
+      return '-';
+    }
+    this.ensureAttachmentState(path);
+    return this.attachmentMeta[path]?.fileSizeLabel || 'ไม่ทราบขนาดไฟล์';
+  }
+
+  private async loadAttachmentMeta(path: string): Promise<void> {
+    try {
+      const response = await fetch(path, { method: 'HEAD' });
+      const size = response.headers.get('content-length');
+      const fileSizeLabel = size ? this.formatBytes(Number(size)) : 'ไม่ทราบขนาดไฟล์';
+      this.attachmentMeta[path] = {
+        fileName: this.getAttachmentFileName(path),
+        fileSizeLabel
+      };
+    } catch {
+      this.attachmentMeta[path] = {
+        fileName: this.getAttachmentFileName(path),
+        fileSizeLabel: 'ไม่ทราบขนาดไฟล์'
+      };
+    }
+  }
+
+  private formatBytes(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes <= 0) {
+      return 'ไม่ทราบขนาดไฟล์';
+    }
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let value = bytes;
+    let unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+    const shown = value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1);
+    return `${shown} ${units[unitIndex]}`;
+  }
+
+  copyTicketId(id?: number): void {
+    if (!id) {
+      return;
+    }
+    const text = `#${id}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        this.openInfo(`คัดลอกเลขทิกเก็ต ${text} แล้ว`);
+      }).catch(() => {
+        this.openInfo('ไม่สามารถคัดลอกเลขทิกเก็ตได้');
+      });
+      return;
+    }
+    this.openInfo('ไม่สามารถคัดลอกเลขทิกเก็ตได้');
+  }
+
+  getLatestUpdateAt(ticket: Ticket): string | null {
+    const createdAt = ticket.CreatedAt ? Date.parse(ticket.CreatedAt) : NaN;
+    const replies = ticket.replies || [];
+    const latestReplyAt = replies.reduce((latest, reply) => {
+      if (!reply.CreatedAt) {
+        return latest;
+      }
+      const ts = Date.parse(reply.CreatedAt);
+      if (Number.isNaN(ts)) {
+        return latest;
+      }
+      return Number.isNaN(latest) || ts > latest ? ts : latest;
+    }, Number.NaN);
+    const latest = [createdAt, latestReplyAt].filter(ts => !Number.isNaN(ts)).sort((a, b) => b - a)[0];
+    if (latest === undefined) {
+      return null;
+    }
+    return new Date(latest).toISOString();
   }
 
   private sortTicketsNewestFirst(list: Ticket[]): Ticket[] {
@@ -149,18 +368,28 @@ export class TicketListComponent implements OnInit {
 
   getCategoryTickets(): Ticket[] {
     const sorted = this.sortTicketsNewestFirst(this.tickets);
+    let filtered = sorted;
     switch (this.activeCategory) {
       case 'open':
-        return sorted.filter(t => (t.status || '').toLowerCase() === 'open');
+        filtered = sorted.filter(t => (t.status || '').toLowerCase() === 'open');
+        break;
       case 'in_progress':
-        return sorted.filter(t => (t.status || '').toLowerCase() === 'in_progress');
+        filtered = sorted.filter(t => (t.status || '').toLowerCase() === 'in_progress');
+        break;
       case 'closed':
-        return sorted.filter(t => (t.status || '').toLowerCase() === 'closed');
+        filtered = sorted.filter(t => (t.status || '').toLowerCase() === 'closed');
+        break;
       case 'unassigned':
-        return sorted.filter(t => !t.assigned_to);
+        filtered = sorted.filter(t => !t.assigned_to);
+        break;
       default:
-        return sorted;
+        filtered = sorted;
+        break;
     }
+    if (this.filterHasAttachment) {
+      filtered = filtered.filter(t => !!t.attachment_path);
+    }
+    return filtered;
   }
 
   login(): void {
@@ -310,16 +539,25 @@ export class TicketListComponent implements OnInit {
     if (!ticket.ID) {
       return;
     }
+    if (this.assigningTicketIds.has(ticket.ID)) {
+      return;
+    }
     if (!this.isLoggedIn) {
       this.openInfo('กรุณาเข้าสู่ระบบเจ้าหน้าที่ก่อน');
       return;
     }
+    this.assigningTicketIds.add(ticket.ID);
     this.ticketService.assignTicket(ticket.ID).subscribe({
       next: (updatedTicket) => {
-        const index = this.tickets.findIndex(t => t.ID === updatedTicket.ID);
+        const merged = this.mergeTicketWithUiState(updatedTicket);
+        const index = this.tickets.findIndex(t => t.ID === merged.ID);
         if (index !== -1) {
-          this.tickets[index] = updatedTicket;
+          this.tickets[index] = merged;
         }
+        merged.showReplies = true;
+        this.ensureRepliesVisible(merged, true);
+        this.openInfo(`รับเคส #${merged.ID} เรียบร้อยแล้ว`);
+        this.assigningTicketIds.delete(ticket.ID as number);
       },
       error: (err) => {
         console.error('Error assigning ticket', err);
@@ -328,8 +566,16 @@ export class TicketListComponent implements OnInit {
         } else {
           this.openInfo('ไม่สามารถรับทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
         }
+        this.assigningTicketIds.delete(ticket.ID as number);
       }
     });
+  }
+
+  isAssigning(ticket: Ticket): boolean {
+    if (!ticket.ID) {
+      return false;
+    }
+    return this.assigningTicketIds.has(ticket.ID);
   }
 
   openDetail(ticket: Ticket): void {
@@ -409,20 +655,12 @@ export class TicketListComponent implements OnInit {
     }
     if (ticket.repliesLoaded) {
       ticket.showReplies = !ticket.showReplies;
+      if (ticket.showReplies) {
+        this.focusReplyInput(ticket.ID);
+      }
       return;
     }
-
-    this.ticketService.getReplies(ticket.ID).subscribe({
-      next: (replies: TicketReply[]) => {
-        ticket.replies = replies;
-        ticket.repliesLoaded = true;
-        ticket.showReplies = true;
-      },
-      error: (err) => {
-        console.error('Error loading ticket replies', err);
-        this.openInfo('ไม่สามารถโหลดประวัติทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
-      }
-    });
+    this.ensureRepliesVisible(ticket, false);
   }
 
   submitReply(ticket: Ticket): void {
@@ -446,11 +684,73 @@ export class TicketListComponent implements OnInit {
         ticket.replies.push(reply);
         ticket.newReplyMessage = '';
         ticket.showReplies = true;
+        if (ticket.ID) {
+          this.focusReplyInput(ticket.ID);
+        }
       },
       error: (err) => {
         console.error('Error adding reply', err);
         this.openInfo('ไม่สามารถส่งข้อความตอบกลับได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
       }
     });
+  }
+
+  onReplyKeydown(event: KeyboardEvent, ticket: Ticket): void {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      this.submitReply(ticket);
+    }
+  }
+
+  getReplyLength(ticket: Ticket): number {
+    return (ticket.newReplyMessage || '').trim().length;
+  }
+
+  private mergeTicketWithUiState(updatedTicket: Ticket): Ticket {
+    const existing = this.tickets.find(t => t.ID === updatedTicket.ID);
+    if (!existing) {
+      return updatedTicket;
+    }
+    return {
+      ...updatedTicket,
+      showReplies: existing.showReplies,
+      repliesLoaded: existing.repliesLoaded,
+      replies: existing.replies,
+      newReplyMessage: existing.newReplyMessage
+    };
+  }
+
+  private ensureRepliesVisible(ticket: Ticket, focusReplyAfterLoaded: boolean): void {
+    if (!ticket.ID) {
+      return;
+    }
+    if (ticket.repliesLoaded) {
+      ticket.showReplies = true;
+      if (focusReplyAfterLoaded) {
+        this.focusReplyInput(ticket.ID);
+      }
+      return;
+    }
+    this.ticketService.getReplies(ticket.ID).subscribe({
+      next: (replies: TicketReply[]) => {
+        ticket.replies = replies;
+        ticket.repliesLoaded = true;
+        ticket.showReplies = true;
+        if (focusReplyAfterLoaded) {
+          this.focusReplyInput(ticket.ID as number);
+        }
+      },
+      error: (err) => {
+        console.error('Error loading ticket replies', err);
+        this.openInfo('ไม่สามารถโหลดประวัติทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
+      }
+    });
+  }
+
+  private focusReplyInput(ticketId: number): void {
+    setTimeout(() => {
+      const element = document.querySelector<HTMLTextAreaElement>(`textarea[data-reply-input-id="${ticketId}"]`);
+      element?.focus();
+    }, 0);
   }
 }

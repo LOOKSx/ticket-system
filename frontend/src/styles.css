@@ -4,16 +4,19 @@
   --primary-dark: #4338ca;
   --primary-light: #818cf8;
   --primary-subtle: #e0e7ff;
+  --primary-hover: var(--primary-dark);
 
   --text-main: #111827;
   --text-secondary: #4b5563;
   --text-muted: #9ca3af;
+  --text-primary: var(--text-main);
 
   --bg-background: #f3f4f6;
   --bg-surface: #ffffff;
   --bg-surface-alt: #f9fafb;
 
   --border: #e5e7eb;
+  --border-hover: #d1d5db;
 
   /* Status Colors */
   --success: #059669;

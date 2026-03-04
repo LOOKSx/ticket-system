@@ -22,6 +22,17 @@ var DB *gorm.DB
 var phoneRegex = regexp.MustCompile(`^0\d{8,10}$`)
 var jwtSecret = []byte("change-this-secret-in-production")
 
+func canonicalRole(role string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "admin":
+		return "Admin", true
+	case "customer":
+		return "customer", true
+	default:
+		return "", false
+	}
+}
+
 func ConnectDatabase() {
 	// Try to get DSN from environment variable (for Cloud)
 	dsn := os.Getenv("DATABASE_URL")
@@ -87,6 +98,7 @@ func main() {
 			"http://127.0.0.1:5173",
 			"http://192.168.50.181:4200",
 			"http://192.168.50.180:4200",
+			"http://10.199.181.159:4200",
 		},
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
@@ -110,8 +122,10 @@ func main() {
 				return
 			}
 
+			email := strings.TrimSpace(payload.Email)
+
 			var user User
-			if err := DB.Where("email = ? AND role = ?", payload.Email, "Admin").First(&user).Error; err != nil {
+			if err := DB.Where("email = ? AND LOWER(TRIM(role)) = ?", email, "admin").First(&user).Error; err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 				return
 			}
@@ -121,9 +135,11 @@ func main() {
 				return
 			}
 
+			role, _ := canonicalRole(user.Role)
+
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 				"sub":  user.ID,
-				"role": user.Role,
+				"role": role,
 				"name": user.Name,
 				"exp":  time.Now().Add(24 * time.Hour).Unix(),
 			})
@@ -134,7 +150,7 @@ func main() {
 				return
 			}
 
-			logActivity(user.ID, user.Name, user.Role, "LOGIN", "ผู้ดูแลระบบเข้าสู่ระบบสำเร็จ", c.ClientIP())
+			logActivity(user.ID, user.Name, role, "LOGIN", "ผู้ดูแลระบบเข้าสู่ระบบสำเร็จ", c.ClientIP())
 
 			c.JSON(http.StatusOK, gin.H{
 				"token": tokenString,
@@ -152,15 +168,19 @@ func main() {
 				return
 			}
 
+			email := strings.TrimSpace(payload.Email)
+
 			var user User
-			if err := DB.Where("email = ? AND role = ?", strings.TrimSpace(payload.Email), "Admin").First(&user).Error; err != nil {
+			if err := DB.Where("email = ? AND LOWER(TRIM(role)) = ?", email, "admin").First(&user).Error; err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 				return
 			}
 
+			role, _ := canonicalRole(user.Role)
+
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 				"sub":  user.ID,
-				"role": user.Role,
+				"role": role,
 				"name": user.Name,
 				"exp":  time.Now().Add(24 * time.Hour).Unix(),
 			})
@@ -258,7 +278,8 @@ func main() {
 			}
 			fmt.Printf("User Found: ID=%d, Role='%s', HashLength=%d\n", user.ID, user.Role, len(user.PasswordHash))
 
-			if strings.TrimSpace(user.Role) != "customer" && strings.TrimSpace(user.Role) != "Admin" {
+			role, ok := canonicalRole(user.Role)
+			if !ok {
 				fmt.Printf("Login Error: Unsupported Role '%s'\n", user.Role)
 				c.JSON(http.StatusForbidden, gin.H{"error": "unsupported_role"})
 				return
@@ -279,7 +300,7 @@ func main() {
 
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 				"sub":  user.ID,
-				"role": user.Role,
+				"role": role,
 				"name": user.Name,
 				"exp":  time.Now().Add(24 * time.Hour).Unix(),
 			})
@@ -294,12 +315,12 @@ func main() {
 			fmt.Println("Login SUCCESS: Token returned.")
 			fmt.Println("=== LOGIN ATTEMPT END ===")
 
-			logActivity(user.ID, user.Name, user.Role, "LOGIN", "ลูกค้าเข้าสู่ระบบสำเร็จ", c.ClientIP())
+			logActivity(user.ID, user.Name, role, "LOGIN", "ลูกค้าเข้าสู่ระบบสำเร็จ", c.ClientIP())
 
 			c.JSON(http.StatusOK, gin.H{
 				"token": tokenString,
 				"name":  user.Name,
-				"role":  user.Role,
+				"role":  role,
 			})
 		})
 

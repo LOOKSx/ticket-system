@@ -91,14 +91,14 @@
         <div class="auth-panel-actions auth-panel-actions-row">
           <button
             type="button"
-            class="header-auth-button secondary"
+            class="header-auth-button"
             (click)="loginCustomer()"
           >
             เข้าสู่ระบบ
           </button>
           <button
             type="button"
-            class="header-auth-button"
+            class="header-auth-button secondary"
             (click)="openRegisterView()"
           >
             ลงทะเบียน
@@ -252,10 +252,6 @@
               </div>
             </div>
 
-            <p class="ticket-contact" style="margin-bottom: 16px;">
-              เบอร์ติดต่อ: {{ t.phone_number || '-' }}
-            </p>
-
             <div class="ticket-attachment" *ngIf="t.attachment_path" style="margin-bottom: 16px;">
               <div *ngIf="isImage(t.attachment_path); else fileLinkCustomer" class="attachment-thumbnail-container">
                 <img [src]="t.attachment_path" class="attachment-thumbnail" (click)="openImage(t.attachment_path)" alt="Attachment Thumbnail">
@@ -272,6 +268,10 @@
                 </a>
               </ng-template>
             </div>
+
+            <p class="ticket-contact" style="margin-bottom: 16px;">
+              เบอร์ติดต่อ: {{ t.phone_number || '-' }}
+            </p>
 
             <div class="ticket-meta-row" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
               <span class="ticket-assignee">

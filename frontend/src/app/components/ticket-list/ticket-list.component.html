@@ -101,6 +101,17 @@
       </button>
     </div>
 
+    <div class="ticket-quick-filters" *ngIf="tickets.length > 0">
+      <button
+        type="button"
+        class="ticket-quick-filter"
+        [class.active]="filterHasAttachment"
+        (click)="filterHasAttachment = !filterHasAttachment"
+      >
+        มีไฟล์แนบเท่านั้น
+      </button>
+    </div>
+
     <div class="ticket-table" *ngIf="tickets.length > 0">
       <!-- Header Row Hidden for Card View -->
       <!--
@@ -121,6 +132,14 @@
               <div class="ticket-item-content">
                 <div class="ticket-item-title">
                     <span class="ticket-id-badge">#{{ t.ID }}</span>
+                    <button
+                      type="button"
+                      class="ticket-id-copy"
+                      (click)="copyTicketId(t.ID); $event.stopPropagation()"
+                      title="คัดลอกเลขทิกเก็ต"
+                    >
+                      คัดลอกเลข
+                    </button>
                     {{ t.title }}
                 </div>
                 <div class="ticket-customer-info">
@@ -137,20 +156,83 @@
         <div class="ticket-detail-row" *ngIf="t.showReplies">
           <div class="ticket-detail-cell">
             <div class="ticket-expanded-details">
-               <div style="margin-bottom: 0.5rem;"><strong>รายละเอียด:</strong> {{ t.description }}</div>
-               <div style="margin-bottom: 0.5rem;"><strong>เบอร์ติดต่อ:</strong> {{ t.phone_number || '-' }}</div>
-               <div style="margin-bottom: 0.5rem;"><strong>ลูกค้า:</strong> {{ t.customer?.name || 'ไม่ระบุ' }}</div>
-               <div style="margin-bottom: 0.5rem;"><strong>ผู้รับผิดชอบ:</strong> {{ t.assigned_to || 'ยังไม่มีผู้รับเคส' }}</div>
-               
-               <div class="expanded-actions" style="margin-top: 1rem; display: flex; gap: 8px; flex-wrap: wrap;">
+               <div class="detail-section-card">
+                 <div class="detail-label-line">รายละเอียดปัญหา</div>
+                 <div class="detail-description-text">{{ t.description }}</div>
+              </div>
+
+               <div class="detail-meta-grid">
+                 <div class="detail-meta-item">
+                   <div class="detail-meta-label">เบอร์ติดต่อ</div>
+                   <div class="detail-meta-value">{{ t.phone_number || '-' }}</div>
+                 </div>
+                 <div class="detail-meta-item">
+                   <div class="detail-meta-label">ลูกค้า</div>
+                   <div class="detail-meta-value">{{ t.customer?.name || 'ไม่ระบุ' }}</div>
+                 </div>
+                 <div class="detail-meta-item">
+                   <div class="detail-meta-label">ผู้รับผิดชอบ</div>
+                   <div class="detail-meta-value">{{ t.assigned_to || 'ยังไม่มีผู้รับเคส' }}</div>
+                 </div>
+                 <div class="detail-meta-item">
+                   <div class="detail-meta-label">อัปเดตล่าสุด</div>
+                   <div class="detail-meta-value">{{ getLatestUpdateAt(t) ? (getLatestUpdateAt(t) | date: 'short') : '-' }}</div>
+                 </div>
+               </div>
+
+               <div class="ticket-attachment detail-section-card" *ngIf="t.attachment_path">
+                <div class="detail-label-line">ไฟล์แนบ</div>
+                <div *ngIf="isImage(t.attachment_path); else fileLink" class="attachment-thumbnail-container">
+                  <div
+                    class="attachment-thumbnail-frame"
+                    [class.is-loading]="isAttachmentLoading(t.attachment_path)"
+                    [class.is-error]="hasAttachmentError(t.attachment_path)"
+                  >
+                    <img
+                      [src]="t.attachment_path"
+                      class="attachment-thumbnail"
+                      [class.is-visible]="!isAttachmentLoading(t.attachment_path) && !hasAttachmentError(t.attachment_path)"
+                      (load)="onAttachmentLoad(t.attachment_path)"
+                      (error)="onAttachmentError(t.attachment_path)"
+                      (click)="openImage(t.attachment_path); $event.stopPropagation()"
+                      alt="Attachment Thumbnail"
+                      title="คลิกเพื่อขยายภาพเต็ม"
+                    >
+                    <div class="attachment-overlay" *ngIf="!hasAttachmentError(t.attachment_path)">
+                      คลิกเพื่อขยาย
+                    </div>
+                    <div class="attachment-fallback" *ngIf="hasAttachmentError(t.attachment_path)">
+                      โหลดรูปไม่สำเร็จ
+                    </div>
+                  </div>
+                  <div class="attachment-meta">
+                    <span class="attachment-meta-name">{{ getAttachmentFileName(t.attachment_path) }}</span>
+                    <span class="attachment-meta-size">{{ getAttachmentSizeLabel(t.attachment_path) }}</span>
+                  </div>
+                </div>
+                <ng-template #fileLink>
+                  <a
+                    [href]="t.attachment_path"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="attachment-pill"
+                  >
+                    <span class="attachment-dot"></span>
+                    <span class="attachment-text">ไฟล์แนบ</span>
+                  </a>
+                </ng-template>
+              </div>
+
+               <div class="expanded-actions">
                   <!-- Unassigned: Show Receive button -->
                   <button
                     type="button"
-                    class="primary-button"
+                    class="primary-button action-main"
                     *ngIf="isLoggedIn && !t.assigned_to"
+                    [disabled]="isAssigning(t)"
                     (click)="assignTicket(t)"
                   >
-                    รับเคส
+                    {{ isAssigning(t) ? 'กำลังรับเคส...' : 'รับเคส' }}
                   </button>
 
                   <!-- Assigned to me: Show Actions -->
@@ -159,7 +241,7 @@
                     
                     <button
                       type="button"
-                      class="secondary-button"
+                      class="secondary-button action-main"
                       *ngIf="t.status !== 'closed'"
                       (click)="completeTicket(t)"
                     >
@@ -168,7 +250,7 @@
 
                     <button
                       type="button"
-                      class="secondary-button danger"
+                      class="secondary-button"
                       (click)="releaseTicket(t)"
                       title="ส่งคืนเคส"
                     >
@@ -187,6 +269,7 @@
                </div>
             </div>
             <div class="ticket-history" *ngIf="t.showReplies">
+              <div class="history-title">ประวัติการตอบกลับ</div>
               <div *ngIf="t.replies && t.replies.length; else noHistory">
                 <div class="history-item" *ngFor="let r of t.replies" [class.is-admin]="isAdmin(r.author_role)">
                   <div class="history-header">
@@ -216,10 +299,17 @@
                   [(ngModel)]="t.newReplyMessage"
                   rows="2"
                   placeholder="พิมพ์ข้อความตอบกลับสำหรับทิกเก็ตนี้"
+                  [attr.data-reply-input-id]="t.ID"
+                  (keydown)="onReplyKeydown($event, t)"
                 ></textarea>
+                <div class="reply-form-meta">
+                  <span>กด Ctrl + Enter เพื่อส่งเร็ว</span>
+                  <span>{{ getReplyLength(t) }} ตัวอักษร</span>
+                </div>
                 <button
                   type="button"
                   class="secondary-button"
+                  [disabled]="!getReplyLength(t)"
                   (click)="submitReply(t)"
                 >
                   ส่งข้อความตอบกลับ
@@ -228,23 +318,6 @@
               <div class="history-login-hint" *ngIf="!isLoggedIn">
                 เข้าสู่ระบบเจ้าหน้าที่เพื่อเพิ่มการตอบกลับในประวัติของทิกเก็ตนี้
               </div>
-            </div>
-
-            <div class="ticket-attachment" *ngIf="t.attachment_path">
-              <div *ngIf="isImage(t.attachment_path); else fileLink" class="attachment-thumbnail-container">
-                <img [src]="t.attachment_path" class="attachment-thumbnail" (click)="openImage(t.attachment_path)" alt="Attachment Thumbnail">
-              </div>
-              <ng-template #fileLink>
-                <a
-                  [href]="t.attachment_path"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="attachment-pill"
-                >
-                  <span class="attachment-dot"></span>
-                  <span class="attachment-text">ไฟล์แนบ</span>
-                </a>
-              </ng-template>
             </div>
           </div>
         </div>
@@ -339,7 +412,27 @@
 
   <div class="image-preview-overlay" *ngIf="previewImage" (click)="closeImage()">
     <div class="image-preview-content" (click)="$event.stopPropagation()">
-      <img [src]="previewImage" class="preview-full-image">
+      <div class="image-preview-toolbar">
+        <button type="button" class="preview-tool-button" (click)="zoomOut()">−</button>
+        <button type="button" class="preview-tool-button" (click)="resetZoom()">100%</button>
+        <button type="button" class="preview-tool-button" (click)="zoomIn()">+</button>
+        <button type="button" class="preview-tool-button" (click)="downloadPreviewImage()">ดาวน์โหลด</button>
+      </div>
+      <div class="image-preview-stage" [class.is-loading]="previewImageLoading" [class.is-error]="previewImageError">
+        <img
+          *ngIf="!previewImageError"
+          [src]="previewImage"
+          class="preview-full-image"
+          [style.transform]="'scale(' + previewZoom + ')'"
+          (load)="onPreviewImageLoad()"
+          (error)="onPreviewImageError()"
+        >
+        <div class="preview-loading" *ngIf="previewImageLoading">กำลังโหลดภาพ...</div>
+        <div class="preview-error" *ngIf="previewImageError">
+          ไม่สามารถโหลดภาพได้
+          <a [href]="previewImage" target="_blank" rel="noopener noreferrer">เปิดในแท็บใหม่</a>
+        </div>
+      </div>
       <button class="preview-close" (click)="closeImage()">×</button>
     </div>
   </div>

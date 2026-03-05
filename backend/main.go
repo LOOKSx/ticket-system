@@ -23,10 +23,14 @@ var phoneRegex = regexp.MustCompile(`^0\d{8,10}$`)
 var jwtSecret = []byte("change-this-secret-in-production")
 
 func canonicalRole(role string) (string, bool) {
-	switch strings.ToLower(strings.TrimSpace(role)) {
-	case "admin":
+	normalized := strings.ToLower(strings.TrimSpace(role))
+	normalized = strings.ReplaceAll(normalized, "_", "")
+	normalized = strings.ReplaceAll(normalized, "-", "")
+	normalized = strings.ReplaceAll(normalized, " ", "")
+	switch normalized {
+	case "admin", "administrator", "agent", "staff", "support", "เจ้าหน้าที่", "แอดมิน":
 		return "Admin", true
-	case "customer":
+	case "customer", "client", "member", "user", "ลูกค้า", "ผู้ใช้":
 		return "customer", true
 	default:
 		return "", false
@@ -91,14 +95,19 @@ func main() {
 	r.Static("/uploads", "./uploads")
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{
-			"http://localhost:4200",
-			"http://127.0.0.1:4200",
-			"http://localhost:5173",
-			"http://127.0.0.1:5173",
-			"http://192.168.50.181:4200",
-			"http://192.168.50.180:4200",
-			"http://10.199.181.159:4200",
+		AllowOriginFunc: func(origin string) bool {
+			if origin == "" {
+				return true
+			}
+			if origin == "http://localhost:4200" || origin == "http://127.0.0.1:4200" ||
+				origin == "http://localhost:5173" || origin == "http://127.0.0.1:5173" {
+				return true
+			}
+			if (strings.HasPrefix(origin, "http://192.168.") || strings.HasPrefix(origin, "http://10.")) &&
+				(strings.HasSuffix(origin, ":4200") || strings.HasSuffix(origin, ":5173")) {
+				return true
+			}
+			return false
 		},
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{"Origin", "Content-Type", "Authorization"},
@@ -125,7 +134,12 @@ func main() {
 			email := strings.TrimSpace(payload.Email)
 
 			var user User
-			if err := DB.Where("email = ? AND LOWER(TRIM(role)) = ?", email, "admin").First(&user).Error; err != nil {
+			if err := DB.Where("email = ?", email).First(&user).Error; err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
+				return
+			}
+			role, ok := canonicalRole(user.Role)
+			if !ok || role != "Admin" {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 				return
 			}
@@ -134,8 +148,6 @@ func main() {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 				return
 			}
-
-			role, _ := canonicalRole(user.Role)
 
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 				"sub":  user.ID,
@@ -171,12 +183,15 @@ func main() {
 			email := strings.TrimSpace(payload.Email)
 
 			var user User
-			if err := DB.Where("email = ? AND LOWER(TRIM(role)) = ?", email, "admin").First(&user).Error; err != nil {
+			if err := DB.Where("email = ?", email).First(&user).Error; err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
 				return
 			}
-
-			role, _ := canonicalRole(user.Role)
+			role, ok := canonicalRole(user.Role)
+			if !ok || role != "Admin" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_credentials"})
+				return
+			}
 
 			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 				"sub":  user.ID,
@@ -280,9 +295,11 @@ func main() {
 
 			role, ok := canonicalRole(user.Role)
 			if !ok {
-				fmt.Printf("Login Error: Unsupported Role '%s'\n", user.Role)
-				c.JSON(http.StatusForbidden, gin.H{"error": "unsupported_role"})
-				return
+				fmt.Printf("Login Warning: Unsupported Role '%s' -> fallback to customer\n", user.Role)
+				role = "customer"
+			}
+			if user.Role != role {
+				DB.Model(&user).Update("role", role)
 			}
 
 			if user.PasswordHash == "" {

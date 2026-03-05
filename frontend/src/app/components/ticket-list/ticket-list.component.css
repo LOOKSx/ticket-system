@@ -886,8 +886,44 @@ button {
 }
 
 @media (max-width: 640px) {
+  .ticket-detail-row {
+    padding: 18px;
+  }
+
+  .detail-section-card {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
   .detail-meta-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .detail-meta-item {
+    padding: 12px 14px;
+  }
+
+  .detail-meta-value {
+    font-size: 15px;
+  }
+
+  .expanded-actions button {
+    font-size: 14px;
+    padding: 8px 14px;
+  }
+
+  .attachment-thumbnail-frame {
+    width: 152px;
+    border-radius: 8px;
+  }
+
+  .attachment-meta-name {
+    font-size: 13px;
+  }
+
+  .attachment-meta-size {
+    font-size: 12px;
   }
 
   .preview-close {

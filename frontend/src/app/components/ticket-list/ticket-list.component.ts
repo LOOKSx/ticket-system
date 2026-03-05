@@ -40,6 +40,8 @@ export class TicketListComponent implements OnInit {
 
   private attachmentImageState: Record<string, { loaded: boolean; error: boolean }> = {};
   private attachmentMeta: Record<string, { fileName: string; fileSizeLabel: string }> = {};
+  private attachmentRenderPath: Record<string, string> = {};
+  private attachmentRetryCount: Record<string, number> = {};
   private assigningTicketIds = new Set<number>();
 
   activeCategory: 'all' | 'open' | 'in_progress' | 'closed' | 'unassigned' = 'all';
@@ -141,12 +143,18 @@ export class TicketListComponent implements OnInit {
     if (!this.attachmentImageState[path]) {
       this.attachmentImageState[path] = { loaded: false, error: false };
     }
+    if (!this.attachmentRenderPath[path]) {
+      this.attachmentRenderPath[path] = this.resolveAttachmentUrl(path);
+    }
+    if (this.attachmentRetryCount[path] === undefined) {
+      this.attachmentRetryCount[path] = 0;
+    }
     if (!this.attachmentMeta[path]) {
       this.attachmentMeta[path] = {
         fileName: this.getAttachmentFileName(path),
         fileSizeLabel: 'กำลังโหลดขนาดไฟล์...'
       };
-      this.loadAttachmentMeta(path);
+      this.loadAttachmentMeta(path, this.attachmentRenderPath[path]);
     }
   }
 
@@ -154,16 +162,34 @@ export class TicketListComponent implements OnInit {
     this.ensureAttachmentState(path);
     this.attachmentImageState[path].loaded = true;
     this.attachmentImageState[path].error = false;
+    this.attachmentRetryCount[path] = 0;
   }
 
   onAttachmentError(path: string): void {
     this.ensureAttachmentState(path);
+    const currentRetry = this.attachmentRetryCount[path] || 0;
+    if (currentRetry < 2) {
+      const nextRetry = currentRetry + 1;
+      this.attachmentRetryCount[path] = nextRetry;
+      this.attachmentImageState[path].loaded = false;
+      this.attachmentImageState[path].error = false;
+      this.attachmentRenderPath[path] = this.buildRetryAttachmentUrl(path, nextRetry);
+      return;
+    }
     this.attachmentImageState[path].loaded = false;
     this.attachmentImageState[path].error = true;
     this.attachmentMeta[path] = {
       fileName: this.getAttachmentFileName(path),
       fileSizeLabel: 'ไม่ทราบขนาดไฟล์'
     };
+  }
+
+  getAttachmentDisplayPath(path?: string): string {
+    if (!path) {
+      return '';
+    }
+    this.ensureAttachmentState(path);
+    return this.attachmentRenderPath[path];
   }
 
   isAttachmentLoading(path?: string): boolean {
@@ -202,9 +228,9 @@ export class TicketListComponent implements OnInit {
     return this.attachmentMeta[path]?.fileSizeLabel || 'ไม่ทราบขนาดไฟล์';
   }
 
-  private async loadAttachmentMeta(path: string): Promise<void> {
+  private async loadAttachmentMeta(path: string, requestPath: string): Promise<void> {
     try {
-      const response = await fetch(path, { method: 'HEAD' });
+      const response = await fetch(requestPath, { method: 'HEAD' });
       const size = response.headers.get('content-length');
       const fileSizeLabel = size ? this.formatBytes(Number(size)) : 'ไม่ทราบขนาดไฟล์';
       this.attachmentMeta[path] = {
@@ -232,6 +258,33 @@ export class TicketListComponent implements OnInit {
     }
     const shown = value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1);
     return `${shown} ${units[unitIndex]}`;
+  }
+
+  private resolveAttachmentUrl(path: string): string {
+    if (/^https?:\/\//i.test(path)) {
+      return path;
+    }
+    if (path.startsWith('/uploads/')) {
+      return path;
+    }
+    return path;
+  }
+
+  private buildRetryAttachmentUrl(path: string, retryStep: number): string {
+    const retryToken = `_r=${Date.now()}`;
+    if (retryStep === 1) {
+      const current = this.attachmentRenderPath[path] || this.resolveAttachmentUrl(path);
+      const joiner = current.includes('?') ? '&' : '?';
+      return `${current}${joiner}${retryToken}`;
+    }
+    if (path.startsWith('/uploads/')) {
+      const host = window.location.hostname;
+      const candidate = `${window.location.protocol}//${host}:8080${path}`;
+      return `${candidate}?${retryToken}`;
+    }
+    const current = this.attachmentRenderPath[path] || this.resolveAttachmentUrl(path);
+    const joiner = current.includes('?') ? '&' : '?';
+    return `${current}${joiner}${retryToken}`;
   }
 
   copyTicketId(id?: number): void {

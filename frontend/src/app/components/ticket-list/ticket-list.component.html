@@ -189,12 +189,12 @@
                     [class.is-error]="hasAttachmentError(t.attachment_path)"
                   >
                     <img
-                      [src]="t.attachment_path"
+                      [src]="getAttachmentDisplayPath(t.attachment_path)"
                       class="attachment-thumbnail"
                       [class.is-visible]="!isAttachmentLoading(t.attachment_path) && !hasAttachmentError(t.attachment_path)"
                       (load)="onAttachmentLoad(t.attachment_path)"
                       (error)="onAttachmentError(t.attachment_path)"
-                      (click)="openImage(t.attachment_path); $event.stopPropagation()"
+                      (click)="openImage(getAttachmentDisplayPath(t.attachment_path)); $event.stopPropagation()"
                       alt="Attachment Thumbnail"
                       title="คลิกเพื่อขยายภาพเต็ม"
                     >
@@ -212,7 +212,7 @@
                 </div>
                 <ng-template #fileLink>
                   <a
-                    [href]="t.attachment_path"
+                    [href]="getAttachmentDisplayPath(t.attachment_path)"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="attachment-pill"

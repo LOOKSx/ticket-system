@@ -2,6 +2,7 @@ import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { finalize } from 'rxjs/operators';
 import { TicketService, Ticket, TicketReply } from './services/ticket.service';
 import { TicketFormComponent } from './components/ticket-form/ticket-form.component';
 import { TicketListComponent } from './components/ticket-list/ticket-list.component';
@@ -30,6 +31,7 @@ export class AppComponent implements OnInit {
   authPanelView: 'login' | 'register' = 'login';
   customerLoginEmail = '';
   customerLoginPassword = '';
+  customerAuthLoading = false;
 
   customerRegisterName = '';
   customerRegisterEmail = '';
@@ -163,6 +165,9 @@ export class AppComponent implements OnInit {
   }
 
   loginCustomer(): void {
+    if (this.customerAuthLoading) {
+      return;
+    }
     this.customerAuthMessage = '';
     const email = this.customerLoginEmail.trim();
     const password = this.customerLoginPassword;
@@ -171,7 +176,12 @@ export class AppComponent implements OnInit {
       return;
     }
 
-    this.ticketService.loginCustomer(email, password).subscribe({
+    this.customerAuthLoading = true;
+    this.ticketService.loginCustomer(email, password).pipe(
+      finalize(() => {
+        this.customerAuthLoading = false;
+      })
+    ).subscribe({
       next: (res) => {
         const role = (res.role || '').trim().toLowerCase();
         if (role === 'admin') {
@@ -262,6 +272,7 @@ export class AppComponent implements OnInit {
     this.authRole = null;
     this.customerLoginEmail = '';
     this.customerLoginPassword = '';
+    this.customerAuthLoading = false;
   }
 
   logoutAgent(): void {

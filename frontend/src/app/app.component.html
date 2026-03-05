@@ -76,6 +76,8 @@
             [(ngModel)]="customerLoginEmail"
             name="headerCustomerLoginEmail"
             placeholder="เช่น customer@example.com"
+            [disabled]="customerAuthLoading"
+            (keydown.enter)="loginCustomer()"
           />
         </div>
         <div class="form-field">
@@ -86,6 +88,8 @@
             [(ngModel)]="customerLoginPassword"
             name="headerCustomerLoginPassword"
             placeholder="กรอกรหัสผ่าน"
+            [disabled]="customerAuthLoading"
+            (keydown.enter)="loginCustomer()"
           />
         </div>
         <div class="auth-panel-actions auth-panel-actions-row">
@@ -93,13 +97,15 @@
             type="button"
             class="header-auth-button"
             (click)="loginCustomer()"
+            [disabled]="customerAuthLoading"
           >
-            เข้าสู่ระบบ
+            {{ customerAuthLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ' }}
           </button>
           <button
             type="button"
             class="header-auth-button secondary"
             (click)="openRegisterView()"
+            [disabled]="customerAuthLoading"
           >
             ลงทะเบียน
           </button>

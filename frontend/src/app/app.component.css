@@ -214,6 +214,13 @@
   box-shadow: var(--shadow);
 }
 
+.header-auth-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .header-auth-button.secondary {
   background: white;
   color: var(--text-secondary);

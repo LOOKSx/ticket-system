@@ -31,11 +31,12 @@ type Ticket struct {
 
 type TicketReply struct {
 	gorm.Model
-	TicketID   uint   `json:"ticket_id"`
-	Ticket     Ticket `gorm:"foreignKey:TicketID" json:"-"`
-	AuthorName string `json:"author_name"`
-	AuthorRole string `json:"author_role"`
-	Message    string `json:"message"`
+	TicketID        uint   `json:"ticket_id"`
+	Ticket          Ticket `gorm:"foreignKey:TicketID" json:"-"`
+	AuthorName      string `json:"author_name"`
+	AuthorRole      string `json:"author_role"`
+	Message         string `json:"message"`
+	AttachmentPath  string `json:"attachment_path"`
 }
 
 type ActivityLog struct {

@@ -232,7 +232,7 @@
             </p>
           </div>
 
-        <div *ngFor="let t of customerTickets" class="ticket-card" style="border-left: 4px solid #4f46e5; border-radius: 4px; overflow: hidden; background: white; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 100%;">
+        <div *ngFor="let t of customerTickets" class="ticket-card" [ngClass]="'priority-border-' + ((t.priority || 'unknown').toLowerCase())" style="border-left: 4px solid transparent; border-radius: 4px; overflow: hidden; background: white; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 100%;">
           <div class="ticket-card-header" style="display: flex; flex-direction: column; gap: 8px; cursor: pointer; padding: 12px 16px; width: 100%; box-sizing: border-box;" (click)="toggleCustomerReplies(t)">
             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
               <div style="font-weight: bold; font-size: 0.95em; display: flex; align-items: center;">
@@ -310,6 +310,22 @@
                   </div>
                   <div class="history-message">
                     {{ r.message }}
+                  </div>
+                  <div class="ticket-attachment" *ngIf="r.attachment_path" style="margin-top: 10px;">
+                    <div *ngIf="isImage(r.attachment_path); else replyFileLinkCustomer" class="attachment-thumbnail-container">
+                      <img [src]="r.attachment_path" class="attachment-thumbnail" (click)="openImage(r.attachment_path)" alt="Reply Attachment Thumbnail">
+                    </div>
+                    <ng-template #replyFileLinkCustomer>
+                      <a
+                        [href]="r.attachment_path"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="attachment-pill"
+                      >
+                        <span class="attachment-dot"></span>
+                        <span class="attachment-text">ไฟล์แนบ</span>
+                      </a>
+                    </ng-template>
                   </div>
                 </div>
               </div>

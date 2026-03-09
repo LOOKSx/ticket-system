@@ -21,6 +21,7 @@ import (
 var DB *gorm.DB
 var phoneRegex = regexp.MustCompile(`^0\d{8,10}$`)
 var jwtSecret = []byte("change-this-secret-in-production")
+var uploadDir = "uploads"
 
 func canonicalRole(role string) (string, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(role))
@@ -82,17 +83,40 @@ func logActivity(userID uint, userName, role, action, details, ip string) {
 	DB.Create(&log)
 }
 
+func resolveUploadDir() string {
+	dir := strings.TrimSpace(os.Getenv("UPLOAD_DIR"))
+	if dir == "" {
+		if strings.EqualFold(strings.TrimSpace(os.Getenv("RENDER")), "true") {
+			return "/var/data/uploads"
+		}
+		return "uploads"
+	}
+	return filepath.Clean(dir)
+}
+
+func attachmentDiskPath(attachmentPath string) string {
+	normalized := strings.TrimSpace(attachmentPath)
+	normalized = strings.TrimPrefix(normalized, "/")
+	normalized = strings.TrimPrefix(normalized, "uploads/")
+	fileName := filepath.Base(normalized)
+	if fileName == "." || fileName == "" {
+		return ""
+	}
+	return filepath.Join(uploadDir, fileName)
+}
+
 func main() {
 	ConnectDatabase()
 	r := gin.Default()
+	uploadDir = resolveUploadDir()
 
 	// Serve Frontend (SPA) logic is now handled by NoRoute at the end of main()
 
-	if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
 		log.Fatal("Failed to create uploads directory", err)
 	}
 
-	r.Static("/uploads", "./uploads")
+	r.Static("/uploads", uploadDir)
 
 	r.Use(cors.New(cors.Config{
 		AllowOriginFunc: func(origin string) bool {
@@ -431,6 +455,19 @@ func main() {
 				c.JSON(http.StatusForbidden, gin.H{"error": "insufficient_permissions"})
 				return
 			}
+			agentName, _ := claims["name"].(string)
+			sub, _ := claims["sub"]
+			var agentID uint
+			switch v := sub.(type) {
+			case float64:
+				agentID = uint(v)
+			case int64:
+				agentID = uint(v)
+			case uint:
+				agentID = v
+			default:
+				agentID = 0
+			}
 
 			var tickets []Ticket
 			if err := DB.Find(&tickets).Error; err != nil {
@@ -440,8 +477,10 @@ func main() {
 
 			for _, t := range tickets {
 				if t.AttachmentPath != "" {
-					path := strings.TrimPrefix(t.AttachmentPath, "/")
-					_ = os.Remove(path)
+					path := attachmentDiskPath(t.AttachmentPath)
+					if path != "" {
+						_ = os.Remove(path)
+					}
 				}
 				DB.Unscoped().Where("ticket_id = ?", t.ID).Delete(&TicketReply{})
 			}
@@ -450,6 +489,7 @@ func main() {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_delete_tickets"})
 				return
 			}
+			logActivity(agentID, agentName, role, "DELETE_TICKET", fmt.Sprintf("ลบทิกเก็ตทั้งหมด %d รายการ", len(tickets)), c.ClientIP())
 
 			c.Status(http.StatusNoContent)
 		})
@@ -545,6 +585,7 @@ func main() {
 				c.JSON(http.StatusForbidden, gin.H{"error": "insufficient_permissions"})
 				return
 			}
+			customerName, _ := claims["name"].(string)
 
 			sub, _ := claims["sub"]
 
@@ -579,8 +620,10 @@ func main() {
 			}
 
 			if ticket.AttachmentPath != "" {
-				path := strings.TrimPrefix(ticket.AttachmentPath, "/")
-				_ = os.Remove(path)
+				path := attachmentDiskPath(ticket.AttachmentPath)
+				if path != "" {
+					_ = os.Remove(path)
+				}
 			}
 
 			DB.Unscoped().Where("ticket_id = ?", ticket.ID).Delete(&TicketReply{})
@@ -589,6 +632,7 @@ func main() {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_delete_ticket"})
 				return
 			}
+			logActivity(customerID, customerName, role, "DELETE_TICKET", fmt.Sprintf("ลูกค้าลบทิกเก็ต #%d", ticket.ID), c.ClientIP())
 
 			c.Status(http.StatusNoContent)
 		})
@@ -644,7 +688,7 @@ func main() {
 			file, err := c.FormFile("attachment")
 			if err == nil {
 				filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(file.Filename))
-				savePath := filepath.Join("uploads", filename)
+				savePath := filepath.Join(uploadDir, filename)
 				if err := c.SaveUploadedFile(file, savePath); err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save attachment"})
 					return
@@ -719,11 +763,40 @@ func main() {
 				return
 			}
 
-			var payload struct {
-				Message string `json:"message"`
+			message := ""
+			var attachmentPath string
+			contentType := strings.ToLower(strings.TrimSpace(c.GetHeader("Content-Type")))
+			if strings.HasPrefix(contentType, "multipart/form-data") {
+				message = strings.TrimSpace(c.PostForm("message"))
+				file, err := c.FormFile("attachment")
+				if err == nil && file != nil {
+					ext := strings.ToLower(filepath.Ext(file.Filename))
+					switch ext {
+					case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".ico", ".tif", ".tiff", ".heic":
+					default:
+						c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_attachment_type"})
+						return
+					}
+					filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(file.Filename))
+					savePath := filepath.Join(uploadDir, filename)
+					if err := c.SaveUploadedFile(file, savePath); err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_save_attachment"})
+						return
+					}
+					attachmentPath = "/uploads/" + filename
+				}
+			} else {
+				var payload struct {
+					Message string `json:"message"`
+				}
+				if err := c.ShouldBindJSON(&payload); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_message"})
+					return
+				}
+				message = strings.TrimSpace(payload.Message)
 			}
 
-			if err := c.ShouldBindJSON(&payload); err != nil || strings.TrimSpace(payload.Message) == "" {
+			if message == "" && attachmentPath == "" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_message"})
 				return
 			}
@@ -745,10 +818,11 @@ func main() {
 			}
 
 			reply := TicketReply{
-				TicketID:   ticket.ID,
-				AuthorName: authorName,
-				AuthorRole: role,
-				Message:    payload.Message,
+				TicketID:       ticket.ID,
+				AuthorName:     authorName,
+				AuthorRole:     role,
+				Message:        message,
+				AttachmentPath: attachmentPath,
 			}
 
 			if err := DB.Create(&reply).Error; err != nil {
@@ -803,6 +877,19 @@ func main() {
 				c.JSON(http.StatusForbidden, gin.H{"error": "insufficient_permissions"})
 				return
 			}
+			agentName, _ := claims["name"].(string)
+			sub, _ := claims["sub"]
+			var agentID uint
+			switch v := sub.(type) {
+			case float64:
+				agentID = uint(v)
+			case int64:
+				agentID = uint(v)
+			case uint:
+				agentID = v
+			default:
+				agentID = 0
+			}
 
 			id := c.Param("id")
 
@@ -813,8 +900,10 @@ func main() {
 			}
 
 			if ticket.AttachmentPath != "" {
-				path := strings.TrimPrefix(ticket.AttachmentPath, "/")
-				_ = os.Remove(path)
+				path := attachmentDiskPath(ticket.AttachmentPath)
+				if path != "" {
+					_ = os.Remove(path)
+				}
 			}
 
 			DB.Unscoped().Where("ticket_id = ?", ticket.ID).Delete(&TicketReply{})
@@ -823,6 +912,7 @@ func main() {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_delete_ticket"})
 				return
 			}
+			logActivity(agentID, agentName, role, "DELETE_TICKET", fmt.Sprintf("เจ้าหน้าที่ลบทิกเก็ต #%d", ticket.ID), c.ClientIP())
 
 			c.Status(http.StatusNoContent)
 		})

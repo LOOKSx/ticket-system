@@ -451,4 +451,5 @@ export class AppComponent implements OnInit {
     this.confirmVisible = false;
     this.pendingConfirmAction = null;
   }
+
 }

@@ -420,3 +420,19 @@
     right: 0;
   }
 }
+
+.ticket-card.priority-border-high {
+  border-left-color: #ff4f64 !important;
+}
+
+.ticket-card.priority-border-medium {
+  border-left-color: #ffb347 !important;
+}
+
+.ticket-card.priority-border-low {
+  border-left-color: #03ea3c !important;
+}
+
+.ticket-card.priority-border-unknown {
+  border-left-color: #9ca3af !important;
+}

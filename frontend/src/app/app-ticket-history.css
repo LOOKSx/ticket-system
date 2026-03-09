@@ -19,17 +19,6 @@
   overflow: hidden;
 }
 
-.panel-my-tickets .ticket-card::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: linear-gradient(to bottom, var(--primary), var(--primary-dark));
-  z-index: 1;
-}
-
 .panel-my-tickets .ticket-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);

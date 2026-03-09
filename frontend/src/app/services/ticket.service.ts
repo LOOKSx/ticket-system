@@ -8,6 +8,7 @@ export interface TicketReply {
   author_name?: string;
   author_role?: string;
   message: string;
+  attachment_path?: string;
   CreatedAt?: string;
 }
 
@@ -27,6 +28,7 @@ export interface Ticket {
   showReplies?: boolean;
   repliesLoaded?: boolean;
   newReplyMessage?: string;
+  newReplyAttachment?: File | null;
 }
 
 export interface AgentUser {
@@ -90,6 +92,17 @@ export class TicketService {
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
 
     return this.http.post<TicketReply>(`${this.apiUrl}/${ticketId}/replies`, { message }, { headers });
+  }
+
+  addReplyWithAttachment(ticketId: number, message: string, attachment: File | null): Observable<TicketReply> {
+    const token = localStorage.getItem('agentToken');
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    const formData = new FormData();
+    formData.append('message', message || '');
+    if (attachment) {
+      formData.append('attachment', attachment);
+    }
+    return this.http.post<TicketReply>(`${this.apiUrl}/${ticketId}/replies`, formData, { headers });
   }
 
   releaseTicket(id: number): Observable<Ticket> {

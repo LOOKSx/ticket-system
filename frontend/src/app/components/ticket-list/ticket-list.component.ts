@@ -58,6 +58,7 @@ export class TicketListComponent implements OnInit {
   previewImageError = false;
 
   filterHasAttachment = false;
+  ticketIdSearch = '';
 
   private attachmentImageState: Record<string, { loaded: boolean; error: boolean }> = {};
   private attachmentMeta: Record<string, { fileName: string; fileSizeLabel: string }> = {};
@@ -1227,6 +1228,27 @@ export class TicketListComponent implements OnInit {
     });
   }
 
+  searchByTicketId(): void {
+    if (!this.isLoggedIn) {
+      this.openInfo('กรุณาเข้าสู่ระบบเจ้าหน้าที่ก่อน');
+      return;
+    }
+    const raw = (this.ticketIdSearch || '').trim();
+    const digits = raw.replace(/[^\d]/g, '');
+    const id = Number.parseInt(digits, 10);
+    if (!Number.isFinite(id)) {
+      this.openInfo('กรุณากรอกเลขทิกเก็ตที่ต้องการค้นหา');
+      return;
+    }
+    const target = this.tickets.find(t => t.ID === id);
+    if (!target) {
+      this.openInfo(`ไม่พบทิกเก็ต #${id}`);
+      return;
+    }
+    this.ticketIdSearch = `#${id}`;
+    this.openRecentInMain(target);
+  }
+
   onReplyAttachmentSelected(event: Event, ticket: Ticket): void {
     const input = event.target as HTMLInputElement;
     if (!input.files || input.files.length === 0) {
@@ -1339,10 +1361,8 @@ export class TicketListComponent implements OnInit {
 
   private focusAssignButton(ticketId: number): void {
     setTimeout(() => {
-      const btn = document.querySelector<HTMLButtonElement>(`button[data-assign-btn-id="${ticketId}"]`);
-      if (btn) {
-        btn.focus();
-      }
+      const element = document.querySelector<HTMLButtonElement>(`button[data-assign-btn-id="${ticketId}"]`);
+      element?.focus();
     }, 0);
   }
 }

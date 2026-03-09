@@ -691,15 +691,35 @@ export class TicketListComponent implements OnInit {
 
   getYAxisTicks(rows: Array<{ dateLabel: string; bars: ActionBars }>): Array<{ label: string; percent: number }> {
     const max = this.getCompareGraphMax(rows);
-    const steps = 4;
-    return Array.from({ length: steps + 1 }, (_, index) => {
-      const percent = (index / steps) * 100;
-      const value = Math.round(max * (index / steps));
-      return {
+    if (max <= 4) {
+      return Array.from({ length: max + 1 }, (_, value) => ({
         label: this.formatChartNumber(value),
-        percent
-      };
+        percent: max > 0 ? (value / max) * 100 : 0
+      }));
+    }
+
+    const steps = 4;
+    const values = Array.from({ length: steps + 1 }, (_, index) => {
+      if (index === 0) {
+        return 0;
+      }
+      if (index === steps) {
+        return max;
+      }
+      return Math.round((max * index) / steps);
     });
+
+    for (let i = 1; i < values.length; i += 1) {
+      if (values[i] <= values[i - 1]) {
+        values[i] = values[i - 1] + 1;
+      }
+    }
+    values[values.length - 1] = max;
+
+    return values.map((value, index) => ({
+      label: this.formatChartNumber(value),
+      percent: (index / steps) * 100
+    }));
   }
 
   getLineGuideRows(): number[] {

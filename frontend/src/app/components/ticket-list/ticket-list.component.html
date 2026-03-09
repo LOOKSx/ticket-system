@@ -1,5 +1,9 @@
-<section class="panel panel-list">
-  <div class="panel-list-header">
+<div class="dashboard-wrapper">
+  <div class="dashboard-main-grid">
+    <div class="dashboard-left-column">
+      <section class="panel panel-list">
+        <div class="panel-list-header">
+
     <h2>รายการทิกเก็ต (เฉพาะเจ้าหน้าที่)</h2>
     <div *ngIf="isLoggedIn" class="panel-list-header-actions">
       <span class="badge badge-neutral">
@@ -42,7 +46,6 @@
   <div *ngIf="isLoggedIn">
     <div *ngIf="tickets.length === 0" class="empty-state">
       <h3>ยังไม่มีทิกเก็ต</h3>
-      <p>เริ่มสร้างทิกเก็ตจากแบบฟอร์มด้านซ้ายเพื่อให้ทีมสนับสนุนรับเรื่อง</p>
     </div>
 
     <div class="analytics-panel" *ngIf="tickets.length > 0">
@@ -80,30 +83,32 @@
       </div>
       <div class="analytics-graph" *ngIf="getActionBarsByDay() as chartRows">
         <div class="bar-chart-wrapper" *ngIf="chartRows.length > 0">
-          <ng-container *ngIf="getCompareGraphMax(chartRows) as chartMax">
+          <ng-container *ngIf="{ max: getCompareGraphMax(chartRows) } as chartData">
             <div class="bar-chart-layout">
               <div class="bar-y-axis">
-                <span *ngFor="let tick of getYAxisTicks(chartRows)" [style.bottom.%]="tick.percent">{{ tick.label }}</span>
+                <div class="chart-inner-area">
+                  <span *ngFor="let tick of getYAxisTicks(chartRows)" [style.bottom.%]="tick.percent">{{ tick.label }}</span>
+                </div>
               </div>
               <div class="bar-plot-area">
-                <div class="bar-grid-line" *ngFor="let tick of getYAxisTicks(chartRows)" [style.bottom.%]="tick.percent"></div>
                 <div class="bar-groups" [style.gridTemplateColumns]="getChartColumns(chartRows)">
+                  <div class="bar-grid-line" *ngFor="let tick of getYAxisTicks(chartRows)" [style.bottom.%]="tick.percent"></div>
                   <div class="bar-group" *ngFor="let row of chartRows">
                     <div class="bar-group-columns">
-                      <div class="bar-column graph-total" [style.height]="getBarHeight(row.bars.create, chartMax)">
+                      <div class="bar-column graph-total" [style.height]="getBarHeight(row.bars.create, chartData.max)">
                         <span *ngIf="row.bars.create > 0">{{ row.bars.create }}</span>
                       </div>
-                      <div class="bar-column graph-progress" [style.height]="getBarHeight(row.bars.progress, chartMax)">
+                      <div class="bar-column graph-progress" [style.height]="getBarHeight(row.bars.progress, chartData.max)">
                         <span *ngIf="row.bars.progress > 0">{{ row.bars.progress }}</span>
                       </div>
-                      <div class="bar-column graph-complete" [style.height]="getBarHeight(row.bars.complete, chartMax)">
+                      <div class="bar-column graph-complete" [style.height]="getBarHeight(row.bars.complete, chartData.max)">
                         <span *ngIf="row.bars.complete > 0">{{ row.bars.complete }}</span>
                       </div>
-                      <div class="bar-column graph-delete" [style.height]="getBarHeight(row.bars.delete, chartMax)">
+                      <div class="bar-column graph-delete" [style.height]="getBarHeight(row.bars.delete, chartData.max)">
                         <span *ngIf="row.bars.delete > 0">{{ row.bars.delete }}</span>
                       </div>
                     </div>
-                    <div class="bar-group-label">{{ row.dateLabel }}</div>
+                    <div class="bar-group-label" [title]="row.dateLabel">{{ row.dateLabel }}</div>
                   </div>
                 </div>
               </div>
@@ -151,9 +156,11 @@
         </table>
       </div>
     </div>
+  </div>
+      </section>
 
-    <div class="ticket-main-layout" *ngIf="tickets.length > 0">
-      <div class="ticket-column-header">
+      <section class="panel panel-list ticket-list-panel" *ngIf="isLoggedIn && tickets.length > 0">
+        <div class="ticket-column-header">
         <h3>รายการทิกเก็ต (เฉพาะเจ้าหน้าที่)</h3>
         <span class="badge badge-neutral">{{ getCategoryTickets().length }} รายการ</span>
       </div>
@@ -222,8 +229,9 @@
           มีไฟล์แนบเท่านั้น
         </button>
       </div>
-      <div class="ticket-table">
-        <div *ngFor="let t of getCategoryTickets()">
+      
+        <div class="ticket-table">
+          <div *ngFor="let t of getCategoryTickets()">
           <div class="ticket-card-wrapper" [ngClass]="'priority-border-' + ((t.priority || 'unknown').toLowerCase())" [attr.data-ticket-id]="t.ID" style="border-left: 4px solid transparent; border-radius: 4px; overflow: hidden; background: white; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 100%;">
             <div class="ticket-row" style="display: flex; flex-direction: column; gap: 8px; cursor: pointer; padding: 12px 16px; width: 100%; box-sizing: border-box;" (click)="toggleReplies(t, 'all')">
               <div class="ticket-item-header">
@@ -258,12 +266,14 @@
                 ></ng-container>
               </div>
             </div>
-          </div>
         </div>
       </div>
     </div>
+      </section>
+    </div>
 
-    <div class="recent-dock" *ngIf="tickets.length > 0">
+    <div class="dashboard-right-column" *ngIf="isLoggedIn && tickets.length > 0">
+      <div class="recent-dock">
       <div class="recent-dock-header">
         <span class="recent-dock-title">10 ทิกเก็ตล่าสุดจากลูกค้า</span>
         <span class="badge badge-neutral">{{ getRecentRepliedTickets().length }} รายการ</span>
@@ -306,8 +316,9 @@
       </ng-template>
     </div>
   </div>
+</div>
 
-  <ng-template #ticketExpandedContent let-t="ticket" let-view="view">
+<ng-template #ticketExpandedContent let-t="ticket" let-view="view">
     <div class="ticket-expanded-details">
       <div class="detail-section-card">
         <div class="detail-label-line">รายละเอียดปัญหา</div>
@@ -543,6 +554,7 @@
       </div>
     </div>
   </ng-template>
+
   <div
     class="detail-overlay"
     *ngIf="detailVisible && detailTicket"
@@ -662,4 +674,3 @@
       <button class="preview-close" (click)="closeImage()">×</button>
     </div>
   </div>
-</section>

@@ -281,7 +281,7 @@
       <div class="recent-dock-body" *ngIf="getRecentRepliedTickets().length > 0; else noRecentDock">
         <div class="recent-dock-item" *ngFor="let t of getRecentRepliedTickets()">
           <div class="ticket-card-wrapper recent-dock-card" [ngClass]="'priority-border-' + ((t.priority || 'unknown').toLowerCase())" style="border-left: 4px solid transparent; border-radius: 4px; overflow: hidden; background: white; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 100%;">
-            <div class="ticket-row recent-dock-row" style="display: flex; flex-direction: column; gap: 6px; cursor: pointer; padding: 10px 12px; width: 100%; box-sizing: border-box;" (click)="openRecentInMain(t)">
+            <div class="ticket-row recent-dock-row" style="display: flex; flex-direction: column; gap: 8px; cursor: pointer; padding: 12px 16px; width: 100%; box-sizing: border-box;" (click)="openRecentInMain(t)">
               <div class="ticket-item-header">
                 <div class="ticket-item-content">
                   <div class="ticket-item-title recent-dock-title-row">
@@ -391,6 +391,7 @@
           *ngIf="isLoggedIn && !t.assigned_to"
           [disabled]="isAssigning(t)"
           (click)="assignTicket(t)"
+          [attr.data-assign-btn-id]="t.ID"
         >
           {{ isAssigning(t) ? 'กำลังรับเคส...' : 'รับเคส' }}
         </button>

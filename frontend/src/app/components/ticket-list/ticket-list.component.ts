@@ -1171,10 +1171,20 @@ export class TicketListComponent implements OnInit {
     if (target.repliesLoaded) {
       target.showReplies = true;
       this.scrollToTicket(ticketId);
+      if (!target.assigned_to) {
+        this.focusAssignButton(ticketId);
+      } else if (target.assigned_to === this.currentAgentName) {
+        this.focusReplyInput(ticketId);
+      }
       return;
     }
     this.ensureRepliesVisible(target, false, true, () => {
       this.scrollToTicket(ticketId);
+      if (!target.assigned_to) {
+        this.focusAssignButton(ticketId);
+      } else if (target.assigned_to === this.currentAgentName) {
+        this.focusReplyInput(ticketId);
+      }
     });
   }
 
@@ -1306,16 +1316,33 @@ export class TicketListComponent implements OnInit {
   }
 
   private scrollToTicket(ticketId: number): void {
-    setTimeout(() => {
+    const maxAttempts = 10;
+    const tryScroll = (attempt: number) => {
       const element = document.querySelector<HTMLElement>(`.ticket-main-layout [data-ticket-id="${ticketId}"]`);
-      element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 0);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      if (attempt < maxAttempts) {
+        setTimeout(() => tryScroll(attempt + 1), 50);
+      }
+    };
+    setTimeout(() => tryScroll(0), 0);
   }
 
   private focusReplyInput(ticketId: number): void {
     setTimeout(() => {
       const element = document.querySelector<HTMLTextAreaElement>(`textarea[data-reply-input-id="${ticketId}"]`);
       element?.focus();
+    }, 0);
+  }
+
+  private focusAssignButton(ticketId: number): void {
+    setTimeout(() => {
+      const btn = document.querySelector<HTMLButtonElement>(`button[data-assign-btn-id="${ticketId}"]`);
+      if (btn) {
+        btn.focus();
+      }
     }, 0);
   }
 }

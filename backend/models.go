@@ -29,6 +29,7 @@ type Ticket struct {
 	Customer       User          `gorm:"foreignKey:CustomerID" json:"customer"`
 	AttachmentPath string        `json:"attachment_path"`
 	AttachmentThumbPath string   `json:"attachment_thumb_path"`
+	Attachments    []TicketAttachment `gorm:"foreignKey:TicketID" json:"attachments,omitempty"`
 	AssignedTo     string        `json:"assigned_to"`
 	AssignedUserID *uint         `gorm:"index" json:"assigned_user_id"`
 	AssignedUser   *User         `gorm:"foreignKey:AssignedUserID" json:"assigned_user,omitempty"`
@@ -45,6 +46,7 @@ type TicketReply struct {
 	Message        string `json:"message"`
 	AttachmentPath string `json:"attachment_path"`
 	AttachmentThumbPath string `json:"attachment_thumb_path"`
+	Attachments    []ReplyAttachment `gorm:"foreignKey:TicketReplyID" json:"attachments,omitempty"`
 }
 
 type ActivityLog struct {
@@ -55,4 +57,18 @@ type ActivityLog struct {
 	Action    string `json:"action"`
 	Details   string `json:"details"`
 	IPAddress string `json:"ip_address"`
+}
+
+type TicketAttachment struct {
+	gorm.Model
+	TicketID  uint   `gorm:"index" json:"ticket_id"`
+	Path      string `json:"path"`
+	ThumbPath string `json:"thumb_path"`
+}
+
+type ReplyAttachment struct {
+	gorm.Model
+	TicketReplyID uint   `gorm:"index" json:"ticket_reply_id"`
+	Path          string `json:"path"`
+	ThumbPath     string `json:"thumb_path"`
 }

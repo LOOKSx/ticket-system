@@ -21,16 +21,23 @@ export class TicketFormComponent {
     phone_number: ''
   };
 
-  selectedFile: File | null = null;
+  selectedFiles: File[] = [];
 
   constructor(private ticketService: TicketService) {}
 
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-      this.selectedFile = input.files[0];
+    const incoming = input.files ? Array.from(input.files) : [];
+    if (incoming.length === 0) {
+      this.selectedFiles = [];
+      return;
+    }
+    const all = [...this.selectedFiles, ...incoming];
+    if (all.length > 5) {
+      this.selectedFiles = all.slice(0, 5);
+      this.formError.emit('เลือกไฟล์ได้สูงสุด 5 ไฟล์ต่อทิกเก็ต');
     } else {
-      this.selectedFile = null;
+      this.selectedFiles = all;
     }
   }
 
@@ -60,21 +67,29 @@ export class TicketFormComponent {
     formData.append('priority', this.newTicket.priority);
     formData.append('phone', phone);
 
-    if (this.selectedFile) {
-      formData.append('attachment', this.selectedFile);
+    if (this.selectedFiles?.length) {
+      // Append as attachments[] to supportหลายไฟล์ (สูงสุด 5 ตามฝั่งเซิร์ฟเวอร์)
+      const files = this.selectedFiles.slice(0, 5);
+      for (const f of files) {
+        formData.append('attachments', f);
+      }
     }
 
     this.ticketService.createTicket(formData).subscribe({
       next: (createdTicket) => {
         this.ticketCreated.emit(createdTicket);
         this.newTicket = { title: '', description: '', priority: 'medium', phone_number: '' };
-        this.selectedFile = null;
+        this.selectedFiles = [];
       },
       error: (err) => {
         console.error('Error creating ticket', err);
         this.formError.emit('ไม่สามารถสร้างทิกเก็ตได้ กรุณาลองใหม่');
       }
     });
+  }
+
+  getSelectedFileNames(): string {
+    return (this.selectedFiles || []).map(f => f.name).join(', ');
   }
 
   isValidThaiPhone(phone: string): boolean {

@@ -367,7 +367,54 @@
           <div class="detail-meta-value">{{ getLatestUpdateAt(t) ? (getLatestUpdateAt(t) | date: 'short') : '-' }}</div>
         </div>
       </div>
-      <div class="ticket-attachment detail-section-card" *ngIf="t.attachment_path">
+      <div class="ticket-attachment detail-section-card" *ngIf="t.attachments?.length">
+        <div class="detail-label-line">ไฟล์แนบ ({{ t.attachments.length }} ไฟล์)</div>
+        <div class="attachment-multi-grid">
+          <ng-container *ngFor="let a of t.attachments">
+            <div *ngIf="isImage(a.path); else fileLinkMulti" class="attachment-thumbnail-container">
+              <div
+                class="attachment-thumbnail-frame"
+                [class.is-loading]="isAttachmentLoading(a.thumb_path || a.path)"
+                [class.is-error]="hasAttachmentError(a.thumb_path || a.path)"
+                (click)="openImage(a.path || '')"
+              >
+                <img
+                  [src]="getAttachmentDisplayPath(a.thumb_path || a.path)"
+                  class="attachment-thumbnail"
+                  [class.is-visible]="!isAttachmentLoading(a.thumb_path || a.path) && !hasAttachmentError(a.thumb_path || a.path)"
+                  (load)="onAttachmentLoad(a.thumb_path || a.path)"
+                  (error)="onAttachmentError(a.thumb_path || a.path)"
+                  (click)="openImage(a.path || '')"
+                  alt="Attachment Thumbnail"
+                  title="คลิกเพื่อขยายภาพเต็ม"
+                >
+                <div class="attachment-overlay" *ngIf="!hasAttachmentError(a.path)">
+                  คลิกเพื่อขยาย
+                </div>
+                <div class="attachment-fallback" *ngIf="hasAttachmentError(a.path)">
+                  โหลดรูปไม่สำเร็จ
+                </div>
+              </div>
+              <div class="attachment-meta">
+                <span class="attachment-meta-name">{{ getAttachmentFileName(a.path) }}</span>
+                <span class="attachment-meta-size">{{ getAttachmentSizeLabel(a.path) }}</span>
+              </div>
+            </div>
+            <ng-template #fileLinkMulti>
+              <a
+                [href]="getAttachmentDisplayPath(a.path)"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="attachment-pill"
+              >
+                <span class="attachment-dot"></span>
+                <span class="attachment-text">{{ getAttachmentFileName(a.path) }}</span>
+              </a>
+            </ng-template>
+          </ng-container>
+        </div>
+      </div>
+      <div class="ticket-attachment detail-section-card" *ngIf="!t.attachments?.length && t.attachment_path">
         <div class="detail-label-line">ไฟล์แนบ</div>
         <div *ngIf="isImage(t.attachment_path); else fileLinkDock" class="attachment-thumbnail-container">
           <div

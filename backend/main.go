@@ -159,7 +159,7 @@ func ConnectDatabase() {
 		log.Fatal("Failed to connect to database!", err)
 	}
 
-	err = database.AutoMigrate(&User{}, &Ticket{}, &TicketReply{}, &ActivityLog{})
+	err = database.AutoMigrate(&User{}, &Ticket{}, &TicketReply{}, &ActivityLog{}, &TicketAttachment{}, &ReplyAttachment{})
 	if err != nil {
 		log.Fatal("Failed to migrate database!", err)
 	}
@@ -861,7 +861,7 @@ func main() {
 			}
 
 			var tickets []Ticket
-			if err := DB.Preload("Customer").Order("created_at desc").Find(&tickets).Error; err != nil {
+			if err := DB.Preload("Customer").Preload("Attachments").Order("created_at desc").Find(&tickets).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_load_tickets"})
 				return
 			}
@@ -915,7 +915,7 @@ func main() {
 			}
 
 			var tickets []Ticket
-			if err := DB.Find(&tickets).Error; err != nil {
+			if err := DB.Preload("Attachments").Find(&tickets).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_load_tickets"})
 				return
 			}
@@ -923,6 +923,14 @@ func main() {
 			for _, t := range tickets {
 				deleteAttachmentPath(t.AttachmentPath)
 				deleteAttachmentPath(t.AttachmentThumbPath)
+				// delete multiple attachments
+				var atts []TicketAttachment
+				_ = DB.Where("ticket_id = ?", t.ID).Find(&atts).Error
+				for _, a := range atts {
+					deleteAttachmentPath(a.Path)
+					deleteAttachmentPath(a.ThumbPath)
+				}
+				DB.Unscoped().Where("ticket_id = ?", t.ID).Delete(&TicketAttachment{})
 				var replies []TicketReply
 				_ = DB.Where("ticket_id = ?", t.ID).Find(&replies).Error
 				for _, r := range replies {
@@ -993,7 +1001,7 @@ func main() {
 			}
 
 			var tickets []Ticket
-			if err := DB.Preload("Customer").Where("customer_id = ?", customerID).Order("created_at desc").Find(&tickets).Error; err != nil {
+			if err := DB.Preload("Customer").Preload("Attachments").Where("customer_id = ?", customerID).Order("created_at desc").Find(&tickets).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_load_tickets"})
 				return
 			}
@@ -1068,6 +1076,14 @@ func main() {
 
 			deleteAttachmentPath(ticket.AttachmentPath)
 			deleteAttachmentPath(ticket.AttachmentThumbPath)
+			// delete multiple attachments
+			var atts []TicketAttachment
+			_ = DB.Where("ticket_id = ?", ticket.ID).Find(&atts).Error
+			for _, a := range atts {
+				deleteAttachmentPath(a.Path)
+				deleteAttachmentPath(a.ThumbPath)
+			}
+			DB.Unscoped().Where("ticket_id = ?", ticket.ID).Delete(&TicketAttachment{})
 			var replies []TicketReply
 			_ = DB.Where("ticket_id = ?", ticket.ID).Find(&replies).Error
 			for _, r := range replies {
@@ -1135,19 +1151,53 @@ func main() {
 
 			var attachmentPath string
 			var attachmentThumbPath string
-			file, err := c.FormFile("attachment")
-			if err == nil && file != nil {
-				path, thumb, err := storeAttachment(c, file)
-				if err != nil {
-					if err.Error() == "invalid_attachment_type" {
-						c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_attachment_type"})
+			var batchAttachments []struct{ Path, Thumb string }
+			// support multiple files under "attachments" or "attachments[]"
+			if form, ferr := c.MultipartForm(); ferr == nil && form != nil {
+				files := form.File["attachments"]
+				if len(files) == 0 {
+					files = form.File["attachments[]"]
+				}
+				// also support legacy single field "attachment"
+				if f, e := c.FormFile("attachment"); e == nil && f != nil {
+					files = append([]*multipart.FileHeader{f}, files...)
+				}
+				// cap to 5 files
+				if len(files) > 5 {
+					files = files[:5]
+				}
+				for _, fh := range files {
+					path, thumb, err := storeAttachment(c, fh)
+					if err != nil {
+						if err.Error() == "invalid_attachment_type" {
+							c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_attachment_type"})
+							return
+						}
+						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_save_attachment"})
 						return
 					}
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_save_attachment"})
-					return
+					batchAttachments = append(batchAttachments, struct{ Path, Thumb string }{path, thumb})
 				}
-				attachmentPath = path
-				attachmentThumbPath = thumb
+				if len(batchAttachments) > 0 {
+					attachmentPath = batchAttachments[0].Path
+					attachmentThumbPath = batchAttachments[0].Thumb
+				}
+			} else {
+				// fallback legacy single
+				if file, err := c.FormFile("attachment"); err == nil && file != nil {
+					path, thumb, err := storeAttachment(c, file)
+					if err != nil {
+						if err.Error() == "invalid_attachment_type" {
+							c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_attachment_type"})
+							return
+						}
+						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_save_attachment"})
+						return
+					}
+					attachmentPath = path
+					attachmentThumbPath = thumb
+					batchAttachments = append(batchAttachments, struct{ Path, Thumb string }{path, thumb})
+				}
 			}
 
 			ticket := Ticket{
@@ -1175,6 +1225,21 @@ func main() {
 			if err := DB.Create(&ticket).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create ticket"})
 				return
+			}
+			// persist multi-attachments if any
+			if len(batchAttachments) > 0 {
+				var ta []TicketAttachment
+				for _, a := range batchAttachments {
+					ta = append(ta, TicketAttachment{
+						TicketID:  ticket.ID,
+						Path:      a.Path,
+						ThumbPath: a.Thumb,
+					})
+				}
+				if err := DB.Create(&ta).Error; err != nil {
+					// non-fatal: continue
+					log.Printf("failed to save TicketAttachment for ticket %d: %v", ticket.ID, err)
+				}
 			}
 
 			DB.Preload("Customer").First(&ticket, ticket.ID)

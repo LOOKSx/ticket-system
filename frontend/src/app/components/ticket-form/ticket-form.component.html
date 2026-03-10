@@ -59,7 +59,7 @@
       </div>
 
       <div class="form-field file-field">
-        <label for="attachment">ไฟล์แนบ (ไม่บังคับ)</label>
+        <label for="attachments">ไฟล์แนบ (ไม่บังคับ, สูงสุด 5 ไฟล์)</label>
         <div class="file-input-wrapper">
           <button
             type="button"
@@ -68,19 +68,25 @@
           >
             เลือกไฟล์
           </button>
-          <span class="file-name" *ngIf="selectedFile; else noFile">
-            {{ selectedFile.name }}
+          <span class="file-name" *ngIf="selectedFiles.length; else noFile">
+            {{ selectedFiles.length }} ไฟล์
           </span>
           <ng-template #noFile>
             <span class="file-name muted">ยังไม่ได้เลือกไฟล์</span>
           </ng-template>
           <input
             #fileInput
-            id="attachment"
+            id="attachments"
             type="file"
+            multiple
             (change)="onFileSelected($event)"
             class="file-input-hidden"
           />
+        </div>
+        <div *ngIf="selectedFiles.length" style="margin-top: 6px;">
+          <small class="helper-text">
+            {{ getSelectedFileNames() }}
+          </small>
         </div>
       </div>
     </div>

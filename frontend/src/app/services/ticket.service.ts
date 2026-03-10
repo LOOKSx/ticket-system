@@ -27,6 +27,7 @@ export interface Ticket {
   customer?: any;
   attachment_path?: string;
   attachment_thumb_path?: string;
+  attachments?: Array<{ path: string; thumb_path?: string }>;
   assigned_to?: string;
   assigned_user_id?: number;
   phone_number?: string;

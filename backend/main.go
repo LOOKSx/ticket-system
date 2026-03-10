@@ -1,19 +1,35 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"image"
+	_ "image/gif"
+	"image/jpeg"
+	_ "image/png"
+	"io"
 	"log"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/image/draw"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -22,6 +38,87 @@ var DB *gorm.DB
 var phoneRegex = regexp.MustCompile(`^0\d{8,10}$`)
 var jwtSecret = []byte("change-this-secret-in-production")
 var uploadDir = "uploads"
+
+type objectStorage struct {
+	client        *minio.Client
+	bucket        string
+	publicBaseURL string
+}
+
+var store *objectStorage
+
+func normalizeBaseURL(raw string) string {
+	u := strings.TrimSpace(raw)
+	u = strings.TrimRight(u, "/")
+	return u
+}
+
+func initObjectStorage() (*objectStorage, error) {
+	endpoint := strings.TrimSpace(os.Getenv("S3_ENDPOINT"))
+	bucket := strings.TrimSpace(os.Getenv("S3_BUCKET"))
+	accessKey := strings.TrimSpace(os.Getenv("S3_ACCESS_KEY"))
+	secretKey := strings.TrimSpace(os.Getenv("S3_SECRET_KEY"))
+	region := strings.TrimSpace(os.Getenv("S3_REGION"))
+	publicBase := normalizeBaseURL(os.Getenv("S3_PUBLIC_BASE_URL"))
+	forcePathStyle := strings.EqualFold(strings.TrimSpace(os.Getenv("S3_FORCE_PATH_STYLE")), "true")
+
+	if endpoint == "" || bucket == "" || accessKey == "" || secretKey == "" {
+		return nil, nil
+	}
+
+	secure := true
+	if u, err := url.Parse(endpoint); err == nil && u.Scheme != "" {
+		secure = strings.EqualFold(u.Scheme, "https")
+		endpoint = u.Host
+	} else {
+		secure = strings.EqualFold(strings.TrimSpace(os.Getenv("S3_USE_SSL")), "true")
+	}
+
+	opts := &minio.Options{
+		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+		Secure: secure,
+		Region: region,
+	}
+	if forcePathStyle {
+		opts.BucketLookup = minio.BucketLookupPath
+	}
+
+	client, err := minio.New(endpoint, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	exists, err := client.BucketExists(ctx, bucket)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{Region: region}); err != nil {
+			return nil, err
+		}
+	}
+
+	if publicBase == "" {
+		scheme := "https"
+		if !secure {
+			scheme = "http"
+		}
+		publicBase = normalizeBaseURL(fmt.Sprintf("%s://%s/%s", scheme, endpoint, bucket))
+	}
+
+	return &objectStorage{client: client, bucket: bucket, publicBaseURL: publicBase}, nil
+}
+
+func (s *objectStorage) publicURL(key string) string {
+	if s == nil {
+		return ""
+	}
+	key = strings.TrimPrefix(key, "/")
+	return s.publicBaseURL + "/" + key
+}
 
 func canonicalRole(role string) (string, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(role))
@@ -86,8 +183,15 @@ func logActivity(userID uint, userName, role, action, details, ip string) {
 func resolveUploadDir() string {
 	dir := strings.TrimSpace(os.Getenv("UPLOAD_DIR"))
 	if dir == "" {
-		if strings.EqualFold(strings.TrimSpace(os.Getenv("RENDER")), "true") {
+		renderFlag := strings.EqualFold(strings.TrimSpace(os.Getenv("RENDER")), "true")
+		if renderFlag {
 			return "/var/data/uploads"
+		}
+		if info, err := os.Stat("/var/data"); err == nil && info.IsDir() {
+			candidate := "/var/data/uploads"
+			if err := os.MkdirAll(candidate, os.ModePerm); err == nil {
+				return candidate
+			}
 		}
 		return "uploads"
 	}
@@ -105,10 +209,351 @@ func attachmentDiskPath(attachmentPath string) string {
 	return filepath.Join(uploadDir, fileName)
 }
 
+func deleteAttachmentPath(path string) {
+	raw := strings.TrimSpace(path)
+	if raw == "" {
+		return
+	}
+	if store != nil && store.client != nil {
+		prefix := store.publicBaseURL + "/"
+		if strings.HasPrefix(raw, prefix) {
+			key := strings.TrimPrefix(raw, prefix)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			_ = store.client.RemoveObject(ctx, store.bucket, key, minio.RemoveObjectOptions{})
+			return
+		}
+	}
+	if disk := attachmentDiskPath(raw); disk != "" {
+		_ = os.Remove(disk)
+	}
+}
+
+func isAllowedImageExt(ext string) bool {
+	switch strings.ToLower(ext) {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".ico", ".tif", ".tiff", ".heic":
+		return true
+	default:
+		return false
+	}
+}
+
+func safeUploadName(original string) string {
+	base := filepath.Base(strings.TrimSpace(original))
+	if base == "" || base == "." {
+		return "file"
+	}
+	base = strings.ReplaceAll(base, "\\", "_")
+	base = strings.ReplaceAll(base, "/", "_")
+	return base
+}
+
+func normalizeTags(tags []string) string {
+	seen := make(map[string]struct{}, len(tags))
+	out := make([]string, 0, len(tags))
+	for _, t := range tags {
+		n := strings.ToLower(strings.TrimSpace(t))
+		if n == "" {
+			continue
+		}
+		if len(n) > 40 {
+			n = n[:40]
+		}
+		if _, ok := seen[n]; ok {
+			continue
+		}
+		seen[n] = struct{}{}
+		out = append(out, n)
+	}
+	return strings.Join(out, ",")
+}
+
+func slackWebhookURL() string {
+	return strings.TrimSpace(os.Getenv("SLACK_WEBHOOK_URL"))
+}
+
+func postSlackMessage(text string) error {
+	webhook := slackWebhookURL()
+	if webhook == "" {
+		return nil
+	}
+	payload := map[string]string{"text": text}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPost, webhook, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("slack_status_%d", resp.StatusCode)
+	}
+	return nil
+}
+
+func buildDailyDigest(now time.Time) (string, error) {
+	var openCount int64
+	if err := DB.Model(&Ticket{}).Where("status <> ?", "closed").Count(&openCount).Error; err != nil {
+		return "", err
+	}
+	var overdueCount int64
+	if err := DB.Model(&Ticket{}).Where("status <> ? AND due_at IS NOT NULL AND due_at < ?", "closed", now).Count(&overdueCount).Error; err != nil {
+		return "", err
+	}
+	soon := now.Add(24 * time.Hour)
+	var dueSoonCount int64
+	if err := DB.Model(&Ticket{}).Where("status <> ? AND due_at IS NOT NULL AND due_at >= ? AND due_at <= ?", "closed", now, soon).Count(&dueSoonCount).Error; err != nil {
+		return "", err
+	}
+	var newest []Ticket
+	if err := DB.Order("created_at desc").Limit(5).Find(&newest).Error; err != nil {
+		return "", err
+	}
+
+	lines := []string{
+		fmt.Sprintf("Daily Digest (%s)", now.Format("2006-01-02")),
+		fmt.Sprintf("Open: %d | Overdue: %d | Due<24h: %d", openCount, overdueCount, dueSoonCount),
+	}
+	for _, t := range newest {
+		lines = append(lines, fmt.Sprintf("#%d [%s] %s", t.ID, t.Status, t.Title))
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
+func runDailyDigestLoop() {
+	enable := strings.EqualFold(strings.TrimSpace(os.Getenv("DIGEST_ENABLED")), "true") || slackWebhookURL() != ""
+	if !enable {
+		return
+	}
+	hour := 9
+	if v := strings.TrimSpace(os.Getenv("DIGEST_HOUR")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 && n <= 23 {
+			hour = n
+		}
+	}
+	var lastSent string
+	ticker := time.NewTicker(15 * time.Minute)
+	go func() {
+		defer ticker.Stop()
+		for range ticker.C {
+			now := time.Now()
+			if now.Hour() != hour || now.Minute() > 14 {
+				continue
+			}
+			day := now.Format("2006-01-02")
+			if lastSent == day {
+				continue
+			}
+			msg, err := buildDailyDigest(now)
+			if err == nil {
+				_ = postSlackMessage(msg)
+				lastSent = day
+			}
+		}
+	}()
+}
+
+func escalateOverdueOnce(now time.Time) ([]Ticket, error) {
+	var tickets []Ticket
+	cutoff := now.Add(-12 * time.Hour)
+	if err := DB.Where("status <> ? AND due_at IS NOT NULL AND due_at < ? AND (last_escalated_at IS NULL OR last_escalated_at < ?)", "closed", now, cutoff).
+		Order("due_at asc").
+		Limit(50).
+		Find(&tickets).Error; err != nil {
+		return nil, err
+	}
+	if len(tickets) == 0 {
+		return tickets, nil
+	}
+	for _, t := range tickets {
+		level := t.EscalationLevel + 1
+		t.EscalationLevel = level
+		t.LastEscalatedAt = &now
+		t.Priority = "High"
+		if err := DB.Save(&t).Error; err != nil {
+			return nil, err
+		}
+		logActivity(0, "system", "system", "ESCALATE_TICKET", fmt.Sprintf("Escalate ticket #%d level=%d", t.ID, level), "")
+	}
+	return tickets, nil
+}
+
+func runEscalationLoop() {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("ESCALATION_ENABLED")), "false") {
+		return
+	}
+	ticker := time.NewTicker(5 * time.Minute)
+	go func() {
+		defer ticker.Stop()
+		for range ticker.C {
+			now := time.Now()
+			tickets, err := escalateOverdueOnce(now)
+			if err != nil || len(tickets) == 0 {
+				continue
+			}
+			lines := []string{fmt.Sprintf("Escalation: %d ticket(s) overdue", len(tickets))}
+			for _, t := range tickets {
+				due := ""
+				if t.DueAt != nil {
+					due = t.DueAt.Format(time.RFC3339)
+				}
+				lines = append(lines, fmt.Sprintf("#%d level=%d due=%s %s", t.ID, t.EscalationLevel, due, t.Title))
+			}
+			_ = postSlackMessage(strings.Join(lines, "\n"))
+		}
+	}()
+}
+
+func makeThumb(img image.Image, maxDim int) image.Image {
+	b := img.Bounds()
+	w := b.Dx()
+	h := b.Dy()
+	if w <= 0 || h <= 0 {
+		return img
+	}
+	scaleW := maxDim
+	scaleH := int(float64(h) * float64(maxDim) / float64(w))
+	if h > w {
+		scaleH = maxDim
+		scaleW = int(float64(w) * float64(maxDim) / float64(h))
+	}
+	if scaleW < 1 {
+		scaleW = 1
+	}
+	if scaleH < 1 {
+		scaleH = 1
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, scaleW, scaleH))
+	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), img, b, draw.Over, nil)
+	return dst
+}
+
+func thumbnailJPEG(fileReader io.Reader) ([]byte, error) {
+	img, _, err := image.Decode(fileReader)
+	if err != nil {
+		return nil, err
+	}
+	thumb := makeThumb(img, 360)
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, thumb, &jpeg.Options{Quality: 80}); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func inferContentType(fileName string, headerContentType string) string {
+	ct := strings.TrimSpace(headerContentType)
+	if ct != "" {
+		return ct
+	}
+	ext := strings.ToLower(filepath.Ext(fileName))
+	if ext != "" {
+		if v := mime.TypeByExtension(ext); v != "" {
+			return v
+		}
+	}
+	return "application/octet-stream"
+}
+
+func storeAttachment(c *gin.Context, fileHeader *multipart.FileHeader) (string, string, error) {
+	if fileHeader == nil {
+		return "", "", nil
+	}
+
+	originalName := safeUploadName(fileHeader.Filename)
+	ext := strings.ToLower(filepath.Ext(originalName))
+	now := time.Now()
+	uniqueName := fmt.Sprintf("%d_%s", now.UnixNano(), originalName)
+	contentType := inferContentType(uniqueName, fileHeader.Header.Get("Content-Type"))
+	tryThumb := strings.HasPrefix(strings.ToLower(strings.TrimSpace(contentType)), "image/") || isAllowedImageExt(ext)
+	if fileHeader.Size > 25*1024*1024 {
+		tryThumb = false
+	}
+
+	if store != nil && store.client != nil {
+		key := fmt.Sprintf("attachments/%04d/%02d/%s", now.Year(), int(now.Month()), uniqueName)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
+		defer cancel()
+
+		f, err := fileHeader.Open()
+		if err != nil {
+			return "", "", err
+		}
+		defer f.Close()
+
+		if _, err := store.client.PutObject(ctx, store.bucket, key, f, fileHeader.Size, minio.PutObjectOptions{
+			ContentType: contentType,
+		}); err != nil {
+			return "", "", err
+		}
+
+		thumbURL := ""
+		if tryThumb {
+			tf, err := fileHeader.Open()
+			if err == nil {
+				defer tf.Close()
+				if thumbBytes, err := thumbnailJPEG(tf); err == nil && len(thumbBytes) > 0 {
+					thumbName := strings.TrimSuffix(uniqueName, ext) + ".jpg"
+					thumbKey := fmt.Sprintf("thumbnails/%04d/%02d/%s", now.Year(), int(now.Month()), thumbName)
+					tr := bytes.NewReader(thumbBytes)
+					_, upErr := store.client.PutObject(ctx, store.bucket, thumbKey, tr, int64(len(thumbBytes)), minio.PutObjectOptions{
+						ContentType: "image/jpeg",
+					})
+					if upErr == nil {
+						thumbURL = store.publicURL(thumbKey)
+					}
+				}
+			}
+		}
+		return store.publicURL(key), thumbURL, nil
+	}
+
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+		return "", "", err
+	}
+
+	savePath := filepath.Join(uploadDir, uniqueName)
+	if err := c.SaveUploadedFile(fileHeader, savePath); err != nil {
+		return "", "", err
+	}
+
+	thumbURL := ""
+	thumbDir := filepath.Join(uploadDir, "thumbs")
+	if tryThumb {
+		if err := os.MkdirAll(thumbDir, os.ModePerm); err == nil {
+			if f, err := os.Open(savePath); err == nil {
+				defer f.Close()
+				if thumbBytes, err := thumbnailJPEG(f); err == nil && len(thumbBytes) > 0 {
+					thumbName := strings.TrimSuffix(uniqueName, ext) + ".jpg"
+					thumbPath := filepath.Join(thumbDir, thumbName)
+					_ = os.WriteFile(thumbPath, thumbBytes, 0644)
+					thumbURL = "/uploads/thumbs/" + thumbName
+				}
+			}
+		}
+	}
+
+	return "/uploads/" + uniqueName, thumbURL, nil
+}
+
 func main() {
 	ConnectDatabase()
 	r := gin.Default()
+	r.Use(gzip.Gzip(gzip.DefaultCompression))
 	uploadDir = resolveUploadDir()
+	s, err := initObjectStorage()
+	if err != nil {
+		log.Fatal("Failed to init object storage", err)
+	}
+	store = s
 
 	// Serve Frontend (SPA) logic is now handled by NoRoute at the end of main()
 
@@ -476,11 +921,13 @@ func main() {
 			}
 
 			for _, t := range tickets {
-				if t.AttachmentPath != "" {
-					path := attachmentDiskPath(t.AttachmentPath)
-					if path != "" {
-						_ = os.Remove(path)
-					}
+				deleteAttachmentPath(t.AttachmentPath)
+				deleteAttachmentPath(t.AttachmentThumbPath)
+				var replies []TicketReply
+				_ = DB.Where("ticket_id = ?", t.ID).Find(&replies).Error
+				for _, r := range replies {
+					deleteAttachmentPath(r.AttachmentPath)
+					deleteAttachmentPath(r.AttachmentThumbPath)
 				}
 				DB.Unscoped().Where("ticket_id = ?", t.ID).Delete(&TicketReply{})
 			}
@@ -619,11 +1066,13 @@ func main() {
 				return
 			}
 
-			if ticket.AttachmentPath != "" {
-				path := attachmentDiskPath(ticket.AttachmentPath)
-				if path != "" {
-					_ = os.Remove(path)
-				}
+			deleteAttachmentPath(ticket.AttachmentPath)
+			deleteAttachmentPath(ticket.AttachmentThumbPath)
+			var replies []TicketReply
+			_ = DB.Where("ticket_id = ?", ticket.ID).Find(&replies).Error
+			for _, r := range replies {
+				deleteAttachmentPath(r.AttachmentPath)
+				deleteAttachmentPath(r.AttachmentThumbPath)
 			}
 
 			DB.Unscoped().Where("ticket_id = ?", ticket.ID).Delete(&TicketReply{})
@@ -685,25 +1134,42 @@ func main() {
 			}
 
 			var attachmentPath string
+			var attachmentThumbPath string
 			file, err := c.FormFile("attachment")
-			if err == nil {
-				filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(file.Filename))
-				savePath := filepath.Join(uploadDir, filename)
-				if err := c.SaveUploadedFile(file, savePath); err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save attachment"})
+			if err == nil && file != nil {
+				path, thumb, err := storeAttachment(c, file)
+				if err != nil {
+					if err.Error() == "invalid_attachment_type" {
+						c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_attachment_type"})
+						return
+					}
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_save_attachment"})
 					return
 				}
-				attachmentPath = "/uploads/" + filename
+				attachmentPath = path
+				attachmentThumbPath = thumb
 			}
 
 			ticket := Ticket{
-				Title:          title,
-				Description:    description,
-				Status:         "open",
-				Priority:       priority,
-				CustomerID:     customerID,
-				AttachmentPath: attachmentPath,
-				PhoneNumber:    phone,
+				Title:               title,
+				Description:         description,
+				Status:              "open",
+				Priority:            priority,
+				CustomerID:          customerID,
+				AttachmentPath:      attachmentPath,
+				AttachmentThumbPath: attachmentThumbPath,
+				PhoneNumber:         phone,
+			}
+			switch strings.ToLower(strings.TrimSpace(priority)) {
+			case "high", "สูง":
+				d := time.Now().Add(24 * time.Hour)
+				ticket.DueAt = &d
+			case "medium", "ปานกลาง":
+				d := time.Now().Add(48 * time.Hour)
+				ticket.DueAt = &d
+			default:
+				d := time.Now().Add(72 * time.Hour)
+				ticket.DueAt = &d
 			}
 
 			if err := DB.Create(&ticket).Error; err != nil {
@@ -765,25 +1231,23 @@ func main() {
 
 			message := ""
 			var attachmentPath string
+			var attachmentThumbPath string
 			contentType := strings.ToLower(strings.TrimSpace(c.GetHeader("Content-Type")))
 			if strings.HasPrefix(contentType, "multipart/form-data") {
 				message = strings.TrimSpace(c.PostForm("message"))
 				file, err := c.FormFile("attachment")
 				if err == nil && file != nil {
-					ext := strings.ToLower(filepath.Ext(file.Filename))
-					switch ext {
-					case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".ico", ".tif", ".tiff", ".heic":
-					default:
-						c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_attachment_type"})
-						return
-					}
-					filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(file.Filename))
-					savePath := filepath.Join(uploadDir, filename)
-					if err := c.SaveUploadedFile(file, savePath); err != nil {
+					path, thumb, err := storeAttachment(c, file)
+					if err != nil {
+						if err.Error() == "invalid_attachment_type" {
+							c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_attachment_type"})
+							return
+						}
 						c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_save_attachment"})
 						return
 					}
-					attachmentPath = "/uploads/" + filename
+					attachmentPath = path
+					attachmentThumbPath = thumb
 				}
 			} else {
 				var payload struct {
@@ -818,11 +1282,12 @@ func main() {
 			}
 
 			reply := TicketReply{
-				TicketID:       ticket.ID,
-				AuthorName:     authorName,
-				AuthorRole:     role,
-				Message:        message,
-				AttachmentPath: attachmentPath,
+				TicketID:            ticket.ID,
+				AuthorName:          authorName,
+				AuthorRole:          role,
+				Message:             message,
+				AttachmentPath:      attachmentPath,
+				AttachmentThumbPath: attachmentThumbPath,
 			}
 
 			if err := DB.Create(&reply).Error; err != nil {
@@ -899,11 +1364,13 @@ func main() {
 				return
 			}
 
-			if ticket.AttachmentPath != "" {
-				path := attachmentDiskPath(ticket.AttachmentPath)
-				if path != "" {
-					_ = os.Remove(path)
-				}
+			deleteAttachmentPath(ticket.AttachmentPath)
+			deleteAttachmentPath(ticket.AttachmentThumbPath)
+			var replies []TicketReply
+			_ = DB.Where("ticket_id = ?", ticket.ID).Find(&replies).Error
+			for _, r := range replies {
+				deleteAttachmentPath(r.AttachmentPath)
+				deleteAttachmentPath(r.AttachmentThumbPath)
 			}
 
 			DB.Unscoped().Where("ticket_id = ?", ticket.ID).Delete(&TicketReply{})
@@ -915,6 +1382,60 @@ func main() {
 			logActivity(agentID, agentName, role, "DELETE_TICKET", fmt.Sprintf("เจ้าหน้าที่ลบทิกเก็ต #%d", ticket.ID), c.ClientIP())
 
 			c.Status(http.StatusNoContent)
+		})
+
+		api.PUT("/tickets/:id/tags", func(c *gin.Context) {
+			authHeader := c.GetHeader("Authorization")
+			if !strings.HasPrefix(authHeader, "Bearer ") {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "missing_or_invalid_token"})
+				return
+			}
+
+			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+			parsedToken, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method")
+				}
+				return jwtSecret, nil
+			})
+			if err != nil || !parsedToken.Valid {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			claims, ok := parsedToken.Claims.(jwt.MapClaims)
+			if !ok {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			role, _ := claims["role"].(string)
+			if role != "Admin" {
+				c.JSON(http.StatusForbidden, gin.H{"error": "insufficient_permissions"})
+				return
+			}
+
+			var payload struct {
+				Tags []string `json:"tags"`
+			}
+			if err := c.ShouldBindJSON(&payload); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_payload"})
+				return
+			}
+
+			id := c.Param("id")
+			var ticket Ticket
+			if err := DB.First(&ticket, id).Error; err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "ticket_not_found"})
+				return
+			}
+
+			ticket.Tags = normalizeTags(payload.Tags)
+			if err := DB.Save(&ticket).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_update_ticket"})
+				return
+			}
+			c.JSON(http.StatusOK, ticket)
 		})
 
 		api.PUT("/tickets/:id/assign", func(c *gin.Context) {
@@ -1162,6 +1683,131 @@ func main() {
 			c.JSON(http.StatusOK, ticket)
 		})
 
+		api.GET("/admin/digest/preview", func(c *gin.Context) {
+			authHeader := c.GetHeader("Authorization")
+			if !strings.HasPrefix(authHeader, "Bearer ") {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "missing_or_invalid_token"})
+				return
+			}
+
+			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+			parsedToken, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method")
+				}
+				return jwtSecret, nil
+			})
+			if err != nil || !parsedToken.Valid {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			claims, ok := parsedToken.Claims.(jwt.MapClaims)
+			if !ok {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			role, _ := claims["role"].(string)
+			if role != "Admin" {
+				c.JSON(http.StatusForbidden, gin.H{"error": "insufficient_permissions"})
+				return
+			}
+
+			text, err := buildDailyDigest(time.Now())
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_build_digest"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"text": text})
+		})
+
+		api.POST("/admin/digest/send", func(c *gin.Context) {
+			authHeader := c.GetHeader("Authorization")
+			if !strings.HasPrefix(authHeader, "Bearer ") {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "missing_or_invalid_token"})
+				return
+			}
+
+			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+			parsedToken, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method")
+				}
+				return jwtSecret, nil
+			})
+			if err != nil || !parsedToken.Valid {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			claims, ok := parsedToken.Claims.(jwt.MapClaims)
+			if !ok {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			role, _ := claims["role"].(string)
+			name, _ := claims["name"].(string)
+			if role != "Admin" {
+				c.JSON(http.StatusForbidden, gin.H{"error": "insufficient_permissions"})
+				return
+			}
+
+			text, err := buildDailyDigest(time.Now())
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_build_digest"})
+				return
+			}
+			if err := postSlackMessage(text); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_send_digest"})
+				return
+			}
+			logActivity(0, name, role, "SEND_DAILY_DIGEST", "Manual send", c.ClientIP())
+			c.JSON(http.StatusOK, gin.H{"sent": true, "text": text})
+		})
+
+		api.POST("/admin/escalate/run", func(c *gin.Context) {
+			authHeader := c.GetHeader("Authorization")
+			if !strings.HasPrefix(authHeader, "Bearer ") {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "missing_or_invalid_token"})
+				return
+			}
+
+			rawToken := strings.TrimPrefix(authHeader, "Bearer ")
+			parsedToken, err := jwt.Parse(rawToken, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method")
+				}
+				return jwtSecret, nil
+			})
+			if err != nil || !parsedToken.Valid {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			claims, ok := parsedToken.Claims.(jwt.MapClaims)
+			if !ok {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+				return
+			}
+
+			role, _ := claims["role"].(string)
+			name, _ := claims["name"].(string)
+			if role != "Admin" {
+				c.JSON(http.StatusForbidden, gin.H{"error": "insufficient_permissions"})
+				return
+			}
+
+			tickets, err := escalateOverdueOnce(time.Now())
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_escalate"})
+				return
+			}
+			logActivity(0, name, role, "RUN_ESCALATION", fmt.Sprintf("count=%d", len(tickets)), c.ClientIP())
+			c.JSON(http.StatusOK, gin.H{"count": len(tickets), "tickets": tickets})
+		})
+
 		api.GET("/admin/logs", func(c *gin.Context) {
 			authHeader := c.GetHeader("Authorization")
 			if !strings.HasPrefix(authHeader, "Bearer ") {
@@ -1203,6 +1849,9 @@ func main() {
 			c.JSON(http.StatusOK, logs)
 		})
 	}
+
+	runDailyDigestLoop()
+	runEscalationLoop()
 
 	// Serve Frontend (Angular) for unknown routes
 	r.NoRoute(func(c *gin.Context) {

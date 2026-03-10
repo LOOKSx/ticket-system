@@ -349,6 +349,20 @@
           <div class="detail-meta-value">{{ t.assigned_to || 'ยังไม่มีผู้รับเคส' }}</div>
         </div>
         <div class="detail-meta-item">
+          <div class="detail-meta-label">แท็ก</div>
+          <div class="detail-meta-value" *ngIf="!t.tagsEditing">
+            <span>{{ t.tags || '-' }}</span>
+            <button type="button" class="secondary-button ghost" *ngIf="isLoggedIn" (click)="startEditTags(t)" style="margin-left: 8px;">
+              แก้ไข
+            </button>
+          </div>
+          <div class="detail-meta-value" *ngIf="t.tagsEditing">
+            <input type="text" [(ngModel)]="t.tagsDraft" placeholder="คั่นด้วยเครื่องหมายจุลภาค เช่น bug, vip, ios">
+            <button type="button" class="secondary-button" (click)="saveTags(t)" style="margin-left: 6px;">บันทึก</button>
+            <button type="button" class="secondary-button ghost" (click)="cancelEditTags(t)" style="margin-left: 6px;">ยกเลิก</button>
+          </div>
+        </div>
+        <div class="detail-meta-item">
           <div class="detail-meta-label">อัปเดตล่าสุด</div>
           <div class="detail-meta-value">{{ getLatestUpdateAt(t) ? (getLatestUpdateAt(t) | date: 'short') : '-' }}</div>
         </div>
@@ -358,17 +372,17 @@
         <div *ngIf="isImage(t.attachment_path); else fileLinkDock" class="attachment-thumbnail-container">
           <div
             class="attachment-thumbnail-frame"
-            [class.is-loading]="isAttachmentLoading(t.attachment_path)"
-            [class.is-error]="hasAttachmentError(t.attachment_path)"
-            (click)="openImage(getAttachmentDisplayPath(t.attachment_path))"
+            [class.is-loading]="isAttachmentLoading(t.attachment_thumb_path || t.attachment_path)"
+            [class.is-error]="hasAttachmentError(t.attachment_thumb_path || t.attachment_path)"
+            (click)="openImage(t.attachment_path || '')"
           >
             <img
-              [src]="getAttachmentDisplayPath(t.attachment_path)"
+              [src]="getAttachmentDisplayPath(t.attachment_thumb_path || t.attachment_path)"
               class="attachment-thumbnail"
-              [class.is-visible]="!isAttachmentLoading(t.attachment_path) && !hasAttachmentError(t.attachment_path)"
-              (load)="onAttachmentLoad(t.attachment_path)"
-              (error)="onAttachmentError(t.attachment_path)"
-              (click)="openImage(getAttachmentDisplayPath(t.attachment_path))"
+              [class.is-visible]="!isAttachmentLoading(t.attachment_thumb_path || t.attachment_path) && !hasAttachmentError(t.attachment_thumb_path || t.attachment_path)"
+              (load)="onAttachmentLoad(t.attachment_thumb_path || t.attachment_path)"
+              (error)="onAttachmentError(t.attachment_thumb_path || t.attachment_path)"
+              (click)="openImage(t.attachment_path || '')"
               alt="Attachment Thumbnail"
               title="คลิกเพื่อขยายภาพเต็ม"
             >
@@ -456,17 +470,17 @@
               <div *ngIf="isImage(r.attachment_path); else replyFileLinkDock" class="attachment-thumbnail-container">
                 <div
                   class="attachment-thumbnail-frame"
-                  [class.is-loading]="isAttachmentLoading(r.attachment_path)"
-                  [class.is-error]="hasAttachmentError(r.attachment_path)"
-                  (click)="openImage(getAttachmentDisplayPath(r.attachment_path))"
+                  [class.is-loading]="isAttachmentLoading(r.attachment_thumb_path || r.attachment_path)"
+                  [class.is-error]="hasAttachmentError(r.attachment_thumb_path || r.attachment_path)"
+                  (click)="openImage(r.attachment_path || '')"
                 >
                   <img
-                    [src]="getAttachmentDisplayPath(r.attachment_path)"
+                    [src]="getAttachmentDisplayPath(r.attachment_thumb_path || r.attachment_path)"
                     class="attachment-thumbnail"
-                    [class.is-visible]="!isAttachmentLoading(r.attachment_path) && !hasAttachmentError(r.attachment_path)"
-                    (load)="onAttachmentLoad(r.attachment_path)"
-                    (error)="onAttachmentError(r.attachment_path)"
-                    (click)="openImage(getAttachmentDisplayPath(r.attachment_path))"
+                    [class.is-visible]="!isAttachmentLoading(r.attachment_thumb_path || r.attachment_path) && !hasAttachmentError(r.attachment_thumb_path || r.attachment_path)"
+                    (load)="onAttachmentLoad(r.attachment_thumb_path || r.attachment_path)"
+                    (error)="onAttachmentError(r.attachment_thumb_path || r.attachment_path)"
+                    (click)="openImage(r.attachment_path || '')"
                     alt="Reply Attachment Thumbnail"
                     title="คลิกเพื่อขยายภาพเต็ม"
                   >
@@ -670,7 +684,14 @@
         <button type="button" class="preview-tool-button" (click)="zoomIn()">+</button>
         <button type="button" class="preview-tool-button" (click)="downloadPreviewImage()">ดาวน์โหลด</button>
       </div>
-      <div class="image-preview-stage" [class.is-loading]="previewImageLoading" [class.is-error]="previewImageError">
+      <div
+        class="image-preview-stage"
+        [class.is-loading]="previewImageLoading"
+        [class.is-error]="previewImageError"
+        (touchstart)="onPreviewTouchStart($event)"
+        (touchmove)="onPreviewTouchMove($event)"
+        (touchend)="onPreviewTouchEnd($event)"
+      >
         <img
           *ngIf="!previewImageError"
           [src]="previewImage"
@@ -681,8 +702,12 @@
         >
         <div class="preview-loading" *ngIf="previewImageLoading">กำลังโหลดภาพ...</div>
         <div class="preview-error" *ngIf="previewImageError">
-          ไม่สามารถโหลดภาพได้
-          <a [href]="previewImage" target="_blank" rel="noopener noreferrer">เปิดในแท็บใหม่</a>
+          <div class="preview-error-icon">⚠️</div>
+          <div class="preview-error-message">ไม่สามารถโหลดภาพได้</div>
+          <div class="preview-error-actions">
+            <button type="button" class="preview-retry-button" (click)="retryPreviewImage()">ลองใหม่</button>
+            <a [href]="previewImage" target="_blank" rel="noopener noreferrer" class="preview-open-link">เปิดในแท็บใหม่</a>
+          </div>
         </div>
       </div>
       <button class="preview-close" (click)="closeImage()">×</button>

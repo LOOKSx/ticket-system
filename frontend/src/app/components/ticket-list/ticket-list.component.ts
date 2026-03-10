@@ -73,6 +73,12 @@ export class TicketListComponent implements OnInit {
   activeCategory: 'all' | 'open' | 'in_progress' | 'closed' | 'unassigned' = 'all';
   analyticsFromDate = '';
   analyticsToDate = '';
+  quickReplies: string[] = [
+    'รับเรื่องไว้ตรวจสอบครับ',
+    'ขอรายละเอียดเพิ่มเติมครับ',
+    'ปัญหานี้แก้ไขแล้วครับ',
+    'โปรดทดสอบอีกครั้งครับ'
+  ];
 
   constructor(private ticketService: TicketService) {}
 
@@ -126,6 +132,9 @@ export class TicketListComponent implements OnInit {
     this.previewZoom = 1;
   }
 
+  private lastTapTime = 0;
+  private pinchStartDistance: number | null = null;
+
   downloadPreviewImage(): void {
     if (!this.previewImage) {
       return;
@@ -147,13 +156,56 @@ export class TicketListComponent implements OnInit {
   onPreviewImageError(): void {
     if (this.previewOriginalPath && this.previewRetry < 2) {
       this.previewRetry += 1;
-      this.previewImageLoading = true;
-      this.previewImageError = false;
-      this.previewImage = this.buildRetryAttachmentUrl(this.previewOriginalPath, this.previewRetry);
+      const retryToken = `_r=${Date.now()}`;
+      const joiner = this.previewOriginalPath.includes('?') ? '&' : '?';
+      this.previewImage = `${this.previewOriginalPath}${joiner}${retryToken}`;
       return;
     }
     this.previewImageLoading = false;
     this.previewImageError = true;
+  }
+
+  retryPreviewImage(): void {
+    if (!this.previewOriginalPath) return;
+    this.previewImageLoading = true;
+    this.previewImageError = false;
+    
+    const retryToken = `_r=${Date.now()}`;
+    const joiner = this.previewOriginalPath.includes('?') ? '&' : '?';
+    this.previewImage = `${this.previewOriginalPath}${joiner}${retryToken}`;
+  }
+
+  onPreviewTouchStart(event: TouchEvent): void {
+    if (event.touches.length === 1) {
+      const now = Date.now();
+      if (now - this.lastTapTime < 250) {
+        this.previewZoom = this.previewZoom < 1.5 ? 2 : 1;
+      }
+      this.lastTapTime = now;
+    } else if (event.touches.length === 2) {
+      const dx = event.touches[0].clientX - event.touches[1].clientX;
+      const dy = event.touches[0].clientY - event.touches[1].clientY;
+      this.pinchStartDistance = Math.hypot(dx, dy);
+    }
+  }
+
+  onPreviewTouchMove(event: TouchEvent): void {
+    if (event.touches.length === 2 && this.pinchStartDistance) {
+      event.preventDefault();
+      const dx = event.touches[0].clientX - event.touches[1].clientX;
+      const dy = event.touches[0].clientY - event.touches[1].clientY;
+      const current = Math.hypot(dx, dy);
+      const ratio = current / this.pinchStartDistance;
+      const next = Math.max(0.5, Math.min(3, Number((this.previewZoom * ratio).toFixed(2))));
+      this.previewZoom = next;
+      this.pinchStartDistance = current;
+    }
+  }
+
+  onPreviewTouchEnd(_event: TouchEvent): void {
+    if (this.previewZoom < 1) this.previewZoom = 1;
+    if (this.previewZoom > 3) this.previewZoom = 3;
+    this.pinchStartDistance = null;
   }
 
   onOverlayClick(): void {
@@ -189,6 +241,24 @@ export class TicketListComponent implements OnInit {
     }
   }
 
+  @HostListener('document:visibilitychange')
+  handleVisibilityChange(): void {
+    if (document.visibilityState === 'visible') {
+      this.refreshAttachmentImages();
+      if (this.previewImage && this.previewOriginalPath && this.previewImageError) {
+        this.previewRetry = 0;
+        this.previewImageLoading = true;
+        this.previewImageError = false;
+        this.previewImage = this.buildRetryAttachmentUrl(this.previewOriginalPath, 1);
+      }
+    }
+  }
+
+  @HostListener('window:online')
+  handleOnline(): void {
+    this.refreshAttachmentImages();
+  }
+
   private ensureAttachmentState(path: string): void {
     if (!this.attachmentImageState[path]) {
       this.attachmentImageState[path] = { loaded: false, error: false };
@@ -205,6 +275,30 @@ export class TicketListComponent implements OnInit {
         fileSizeLabel: 'กำลังโหลดขนาดไฟล์...'
       };
       this.loadAttachmentMeta(path, this.attachmentRenderPath[path]);
+    }
+  }
+
+  private refreshAttachmentImages(): void {
+    const paths = Object.keys(this.attachmentImageState);
+    for (const path of paths) {
+      const state = this.attachmentImageState[path];
+      if (!state) {
+        continue;
+      }
+      if (!state.error && state.loaded) {
+        continue;
+      }
+      this.attachmentRetryCount[path] = 0;
+      state.loaded = false;
+      state.error = false;
+      this.attachmentRenderPath[path] = this.buildRetryAttachmentUrl(path, 1);
+      if (this.attachmentMeta[path]) {
+        this.attachmentMeta[path] = {
+          fileName: this.getAttachmentFileName(path),
+          fileSizeLabel: 'กำลังโหลดขนาดไฟล์...'
+        };
+        this.loadAttachmentMeta(path, this.attachmentRenderPath[path]);
+      }
     }
   }
 
@@ -308,6 +402,43 @@ export class TicketListComponent implements OnInit {
     }
     const shown = value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1);
     return `${shown} ${units[unitIndex]}`;
+  }
+
+  insertQuickReply(t: Ticket, text: string): void {
+    t.newReplyMessage = ((t.newReplyMessage || '') + (t.newReplyMessage ? '\n' : '') + text).slice(0, 2000);
+  }
+
+  startEditTags(t: Ticket): void {
+    if (!t.tagsEditing) {
+      t.tagsDraft = t.tags || '';
+      t.tagsEditing = true;
+    }
+  }
+
+  cancelEditTags(t: Ticket): void {
+    t.tagsEditing = false;
+    t.tagsDraft = t.tags || '';
+  }
+
+  saveTags(t: Ticket): void {
+    if (!t.ID) {
+      return;
+    }
+    const tags = (t.tagsDraft || '')
+      .split(',')
+      .map(x => x.trim())
+      .filter(x => !!x);
+    this.ticketService.updateTicketTags(t.ID, tags).subscribe({
+      next: (updated) => {
+        t.tags = updated.tags;
+        t.tagsEditing = false;
+        t.tagsDraft = t.tags || '';
+        this.openInfo('บันทึกแท็กสำเร็จ');
+      },
+      error: () => {
+        this.openInfo('บันทึกแท็กล้มเหลว');
+      }
+    });
   }
 
   private resolveAttachmentUrl(path: string): string {

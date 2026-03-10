@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"gorm.io/gorm"
 )
 
@@ -17,13 +19,18 @@ type Ticket struct {
 	gorm.Model
 	Title          string        `json:"title"`
 	Description    string        `json:"description"`
-	Status         string        `json:"status"`
-	Priority       string        `json:"priority"`
-	CustomerID     uint          `json:"customer_id"`
+	Status         string        `gorm:"index" json:"status"`
+	Priority       string        `gorm:"index" json:"priority"`
+	DueAt          *time.Time    `gorm:"index" json:"due_at,omitempty"`
+	EscalationLevel int          `gorm:"index" json:"escalation_level"`
+	LastEscalatedAt *time.Time   `gorm:"index" json:"last_escalated_at,omitempty"`
+	Tags           string        `json:"tags"`
+	CustomerID     uint          `gorm:"index" json:"customer_id"`
 	Customer       User          `gorm:"foreignKey:CustomerID" json:"customer"`
 	AttachmentPath string        `json:"attachment_path"`
+	AttachmentThumbPath string   `json:"attachment_thumb_path"`
 	AssignedTo     string        `json:"assigned_to"`
-	AssignedUserID *uint         `json:"assigned_user_id"`
+	AssignedUserID *uint         `gorm:"index" json:"assigned_user_id"`
 	AssignedUser   *User         `gorm:"foreignKey:AssignedUserID" json:"assigned_user,omitempty"`
 	PhoneNumber    string        `json:"phone_number"`
 	Replies        []TicketReply `gorm:"foreignKey:TicketID" json:"replies,omitempty"`
@@ -31,12 +38,13 @@ type Ticket struct {
 
 type TicketReply struct {
 	gorm.Model
-	TicketID        uint   `json:"ticket_id"`
-	Ticket          Ticket `gorm:"foreignKey:TicketID" json:"-"`
-	AuthorName      string `json:"author_name"`
-	AuthorRole      string `json:"author_role"`
-	Message         string `json:"message"`
-	AttachmentPath  string `json:"attachment_path"`
+	TicketID        uint   `gorm:"index" json:"ticket_id"`
+	Ticket         Ticket `gorm:"foreignKey:TicketID" json:"-"`
+	AuthorName     string `json:"author_name"`
+	AuthorRole     string `json:"author_role"`
+	Message        string `json:"message"`
+	AttachmentPath string `json:"attachment_path"`
+	AttachmentThumbPath string `json:"attachment_thumb_path"`
 }
 
 type ActivityLog struct {

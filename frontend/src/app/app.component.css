@@ -245,6 +245,34 @@
 @media (max-width: 640px) {
   .header {
     padding: 12px 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .header-title h1 {
+    font-size: 16px;
+  }
+  .header-title p {
+    display: none;
+  }
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 10px;
+  }
+  .header-customer-summary {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 10px;
+  }
+  .header-auth-button {
+    min-height: 40px;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  .header-customer-name {
+    padding: 8px 12px;
+    font-size: 14px;
   }
 }
 
@@ -259,6 +287,15 @@
 .layout-left {
   max-width: 800px;
   margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+  .layout {
+    padding: 148px 16px 24px;
+  }
+  .layout-left {
+    max-width: 100%;
+  }
 }
 
 /* Confirmation Overlay */

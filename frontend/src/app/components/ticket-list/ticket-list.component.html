@@ -360,6 +360,7 @@
             class="attachment-thumbnail-frame"
             [class.is-loading]="isAttachmentLoading(t.attachment_path)"
             [class.is-error]="hasAttachmentError(t.attachment_path)"
+            (click)="openImage(getAttachmentDisplayPath(t.attachment_path))"
           >
             <img
               [src]="getAttachmentDisplayPath(t.attachment_path)"
@@ -457,6 +458,7 @@
                   class="attachment-thumbnail-frame"
                   [class.is-loading]="isAttachmentLoading(r.attachment_path)"
                   [class.is-error]="hasAttachmentError(r.attachment_path)"
+                  (click)="openImage(getAttachmentDisplayPath(r.attachment_path))"
                 >
                   <img
                     [src]="getAttachmentDisplayPath(r.attachment_path)"
@@ -660,7 +662,7 @@
     </div>
   </div>
 
-  <div class="image-preview-overlay" *ngIf="previewImage" (click)="closeImage()">
+  <div class="image-preview-overlay" *ngIf="previewImage" (click)="onOverlayClick()">
     <div class="image-preview-content" (click)="$event.stopPropagation()">
       <div class="image-preview-toolbar">
         <button type="button" class="preview-tool-button" (click)="zoomOut()">−</button>

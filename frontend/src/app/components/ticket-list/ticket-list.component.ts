@@ -56,6 +56,9 @@ export class TicketListComponent implements OnInit {
   previewZoom = 1;
   previewImageLoading = false;
   previewImageError = false;
+  private previewOriginalPath: string | null = null;
+  private previewRetry = 0;
+  private previewOpenedAt = 0;
 
   filterHasAttachment = false;
   ticketIdSearch = '';
@@ -90,10 +93,13 @@ export class TicketListComponent implements OnInit {
   }
 
   openImage(path: string): void {
+    this.previewOriginalPath = path;
+    this.previewRetry = 0;
     this.previewImage = path;
     this.previewZoom = 1;
     this.previewImageLoading = true;
     this.previewImageError = false;
+    this.previewOpenedAt = Date.now();
     document.body.style.overflow = 'hidden';
   }
 
@@ -102,6 +108,9 @@ export class TicketListComponent implements OnInit {
     this.previewImageLoading = false;
     this.previewImageError = false;
     this.previewZoom = 1;
+    this.previewOriginalPath = null;
+    this.previewRetry = 0;
+    this.previewOpenedAt = 0;
     document.body.style.overflow = '';
   }
 
@@ -132,11 +141,27 @@ export class TicketListComponent implements OnInit {
   onPreviewImageLoad(): void {
     this.previewImageLoading = false;
     this.previewImageError = false;
+    this.previewRetry = 0;
   }
 
   onPreviewImageError(): void {
+    if (this.previewOriginalPath && this.previewRetry < 2) {
+      this.previewRetry += 1;
+      this.previewImageLoading = true;
+      this.previewImageError = false;
+      this.previewImage = this.buildRetryAttachmentUrl(this.previewOriginalPath, this.previewRetry);
+      return;
+    }
     this.previewImageLoading = false;
     this.previewImageError = true;
+  }
+
+  onOverlayClick(): void {
+    const now = Date.now();
+    if (now - this.previewOpenedAt < 200) {
+      return;
+    }
+    this.closeImage();
   }
 
   @HostListener('document:keydown', ['$event'])

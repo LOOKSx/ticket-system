@@ -37,6 +37,32 @@
       </small>
     </div>
 
+    <div class="form-row">
+      <div class="form-field">
+        <label for="department">จากหน่วยงาน</label>
+        <select
+          id="department"
+          [(ngModel)]="department"
+          name="department"
+        >
+          <option value="" disabled>เลือกหน่วยงาน</option>
+          <option *ngFor="let dept of departmentOptions" [value]="dept">{{ dept }}</option>
+        </select>
+      </div>
+
+      <div class="form-field">
+        <label for="service">งานบริการ</label>
+        <select
+          id="service"
+          [(ngModel)]="service"
+          name="service"
+        >
+          <option value="" disabled>เลือกงานบริการ</option>
+          <option *ngFor="let s of serviceOptions" [value]="s">{{ s }}</option>
+        </select>
+      </div>
+    </div>
+
     <div class="form-field">
       <label for="description">รายละเอียด</label>
       <textarea

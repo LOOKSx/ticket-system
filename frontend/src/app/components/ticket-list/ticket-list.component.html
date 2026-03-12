@@ -3,42 +3,32 @@
     <div class="dashboard-left-column">
       <section class="panel panel-list">
         <div class="panel-list-header">
-
-    <h2>รายการทิกเก็ต (เฉพาะเจ้าหน้าที่)</h2>
-    <div *ngIf="isLoggedIn" class="panel-list-header-actions">
-      <span class="badge badge-neutral">
-        {{ tickets.length }} รายการ
-      </span>
-      <span class="Admin-name-inline">
-        เจ้าหน้าที่: {{ currentAgentName }}
-      </span>
-      <div class="ticket-id-search">
-        <input
-          type="text"
-          inputmode="numeric"
-          class="ticket-id-search-input"
-          placeholder="ค้นหา #ไอดีทิกเก็ต"
-          [(ngModel)]="ticketIdSearch"
-          (keydown.enter)="searchByTicketId()"
-        >
-        <button type="button" class="secondary-button" (click)="searchByTicketId()">ค้นหา</button>
-      </div>
-      <button
-        type="button"
-        class="secondary-button ghost"
-        (click)="requestReset()"
-      >
-        รีเซ็ต
-      </button>
-      <button
-        type="button"
-        class="secondary-button danger"
-        (click)="clearAllTickets()"
-      >
-        ล้างทิกเก็ตทั้งหมด
-      </button>
-    </div>
-  </div>
+          <div class="panel-list-header-left">
+            <h2>รายการทิกเก็ต (เฉพาะเจ้าหน้าที่)</h2>
+          </div>
+          <div *ngIf="isLoggedIn" class="panel-list-header-actions">
+            <span class="badge badge-neutral">
+              {{ tickets.length }} รายการ
+            </span>
+            <span class="Admin-name-inline">
+              เจ้าหน้าที่: {{ currentAgentName }}
+            </span>
+            <button
+              type="button"
+              class="secondary-button ghost"
+              (click)="requestReset()"
+            >
+              รีเซ็ต
+            </button>
+            <button
+              type="button"
+              class="secondary-button danger"
+              (click)="clearAllTickets()"
+            >
+              ล้างทิกเก็ตทั้งหมด
+            </button>
+          </div>
+        </div>
 
   <div *ngIf="!isLoggedIn" class="empty-state">
     <h3>สำหรับเจ้าหน้าที่เท่านั้น</h3>
@@ -170,81 +160,263 @@
   </div>
       </section>
 
-      <section class="panel panel-list ticket-list-panel" *ngIf="isLoggedIn && tickets.length > 0">
+      <section class="panel panel-list ticket-list-panel" *ngIf="isLoggedIn">
         <div class="ticket-column-header">
-        <h3>รายการทิกเก็ต (เฉพาะเจ้าหน้าที่)</h3>
-        <span class="badge badge-neutral">{{ getCategoryTickets().length }} รายการ</span>
-      </div>
-      <div class="ticket-tabs">
-        <button
-          type="button"
-          class="ticket-tab"
-          [class.active]="activeCategory === 'all'"
-          (click)="activeCategory = 'all'"
-        >
-          ทั้งหมด
-          <span class="ticket-tab-count">{{ tickets.length }}</span>
-        </button>
-        <button
-          type="button"
-          class="ticket-tab"
-          [class.active]="activeCategory === 'open'"
-          (click)="activeCategory = 'open'"
-        >
-          ใหม่
-          <span class="ticket-tab-count">
-            {{ countByStatus('open') }}
-          </span>
-        </button>
-        <button
-          type="button"
-          class="ticket-tab"
-          [class.active]="activeCategory === 'in_progress'"
-          (click)="activeCategory = 'in_progress'"
-        >
-          กำลังดำเนินการ
-          <span class="ticket-tab-count">
-            {{ countByStatus('in_progress') }}
-          </span>
-        </button>
-        <button
-          type="button"
-          class="ticket-tab"
-          [class.active]="activeCategory === 'closed'"
-          (click)="activeCategory = 'closed'"
-        >
-          ปิดงานแล้ว
-          <span class="ticket-tab-count">
-            {{ countByStatus('closed') }}
-          </span>
-        </button>
-        <button
-          type="button"
-          class="ticket-tab"
-          [class.active]="activeCategory === 'unassigned'"
-          (click)="activeCategory = 'unassigned'"
-        >
-          ยังไม่รับเคส
-          <span class="ticket-tab-count">
-            {{ countUnassigned() }}
-          </span>
-        </button>
-      </div>
-      <div class="ticket-quick-filters">
-        <button
-          type="button"
-          class="ticket-quick-filter"
-          [class.active]="filterHasAttachment"
-          (click)="filterHasAttachment = !filterHasAttachment"
-        >
-          มีไฟล์แนบเท่านั้น
-        </button>
-      </div>
+          <div class="ticket-column-header-left">
+            <h3>{{ showClosedTickets ? 'ทิกเก็ตที่เสร็จสิ้นแล้ว (เฉพาะเจ้าหน้าที่)' : 'รายการทิกเก็ต (เฉพาะเจ้าหน้าที่)' }}</h3>
+            <div class="ticket-column-header-subtitle" *ngIf="showClosedTickets">
+              แสดงเฉพาะทิกเก็ตที่เสร็จสิ้นแล้ว
+            </div>
+          </div>
+          <div class="ticket-column-header-actions">
+            <button
+              type="button"
+              class="secondary-button ghost ticket-archive-button ticket-archive-button-success"
+              *ngIf="!showClosedTickets"
+              (click)="openClosedTickets()"
+            >
+              งานที่เสร็จสิ้นแล้ว
+              <span class="badge badge-neutral">{{ getClosedTicketCount() }}</span>
+            </button>
+            <button
+              type="button"
+              class="secondary-button ghost ticket-archive-button"
+              *ngIf="showClosedTickets"
+              (click)="backToActiveTickets()"
+            >
+              กลับไปทิกเก็ตที่กำลังดำเนินการ
+            </button>
+            <button type="button" class="secondary-button" (click)="toggleCreateTicket()" *ngIf="!showClosedTickets">
+              {{ createTicketVisible ? 'ยกเลิก' : 'สร้างทิกเก็ตแทนลูกค้า' }}
+            </button>
+            <span class="badge badge-neutral ticket-header-count-badge" *ngIf="showClosedTickets">{{ getClosedTicketCount() }} รายการ</span>
+          </div>
+        </div>
+        <div *ngIf="createTicketVisible" class="create-ticket-panel">
+          <h2>สร้างทิกเก็ตใหม่</h2>
+          <p class="panel-subtitle">
+            กรอกข้อมูลคำขอให้ครบถ้วนเพื่อให้ทีมสนับสนุนสามารถดำเนินการได้อย่างรวดเร็ว
+          </p>
+
+          <form (ngSubmit)="submitCreateTicket()" class="form">
+            <div class="form-row">
+              <div class="form-field">
+                <label for="adminCustomerName">ชื่อลูกค้า</label>
+                <input
+                  id="adminCustomerName"
+                  type="text"
+                  [(ngModel)]="createCustomerName"
+                  name="adminCustomerName"
+                  placeholder="ชื่อลูกค้า"
+                />
+              </div>
+
+              <div class="form-field">
+                <label for="adminCustomerEmail">อีเมล (ถ้ามี)</label>
+                <input
+                  id="adminCustomerEmail"
+                  type="email"
+                  [(ngModel)]="createCustomerEmail"
+                  name="adminCustomerEmail"
+                  placeholder="example@email.com"
+                />
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label for="adminPhone">เบอร์มือถือผู้ติดต่อ</label>
+              <input
+                id="adminPhone"
+                type="tel"
+                [(ngModel)]="createPhone"
+                name="adminPhone"
+                placeholder="เช่น 09X-XXX-XXXX"
+              />
+              <small class="helper-text">
+                กรุณากรอกเบอร์มือถือ 10 หลัก 
+              </small>
+            </div>
+
+            <div class="form-row">
+              <div class="form-field">
+                <label for="adminDepartment">จากหน่วยงาน</label>
+                <select
+                  id="adminDepartment"
+                  [(ngModel)]="createDepartment"
+                  name="adminDepartment"
+                >
+                  <option value="" disabled>เลือกหน่วยงาน</option>
+                  <option *ngFor="let dept of departmentOptions" [value]="dept">{{ dept }}</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="adminService">งานบริการ</label>
+                <select
+                  id="adminService"
+                  [(ngModel)]="createService"
+                  name="adminService"
+                >
+                  <option value="" disabled>เลือกงานบริการ</option>
+                  <option *ngFor="let s of serviceOptions" [value]="s">{{ s }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label for="adminTitle">หัวข้อทิกเก็ต</label>
+              <input
+                id="adminTitle"
+                type="text"
+                [(ngModel)]="createTitle"
+                name="adminTitle"
+                placeholder="สอบถาม หรือปัญหาต่างๆ"
+              />
+            </div>
+
+            <div class="form-field">
+              <label for="adminDescription">รายละเอียด</label>
+              <textarea
+                id="adminDescription"
+                [(ngModel)]="createDescription"
+                name="adminDescription"
+                rows="4"
+                placeholder="อธิบายปัญหาหรือคำขอ รวมถึงขั้นตอนที่ทำให้เกิดเหตุการณ์นี้"
+              ></textarea>
+            </div>
+
+            <div class="form-row">
+              <div class="form-field">
+                <label for="adminPriority">ความเร่งด่วน</label>
+                <select id="adminPriority" [(ngModel)]="createPriority" name="adminPriority">
+                  <option value="low">ต่ำ</option>
+                  <option value="medium">ปานกลาง</option>
+                  <option value="high">สูง</option>
+                </select>
+              </div>
+
+              <div class="form-field file-field">
+                <label for="adminAttachments">ไฟล์แนบ (ไม่บังคับ, สูงสุด 5 ไฟล์)</label>
+                <div class="file-input-wrapper">
+                  <button
+                    type="button"
+                    class="file-button"
+                    (click)="adminFileInput.click()"
+                  >
+                    เลือกไฟล์
+                  </button>
+                  <span class="file-name" *ngIf="createAttachments.length; else noAdminFile">
+                    {{ createAttachments.length }} ไฟล์
+                  </span>
+                  <ng-template #noAdminFile>
+                    <span class="file-name muted">ยังไม่ได้เลือกไฟล์</span>
+                  </ng-template>
+                  <input
+                    #adminFileInput
+                    id="adminAttachments"
+                    type="file"
+                    multiple
+                    (change)="onCreateAttachmentsSelected($event)"
+                    class="file-input-hidden"
+                  />
+                </div>
+                <div *ngIf="createAttachments.length" class="file-helper">
+                  <small class="helper-text">
+                    {{ getCreateSelectedFileNames() }}
+                  </small>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button
+                type="submit"
+                class="primary-button"
+                [disabled]="creatingTicket"
+              >
+                {{ creatingTicket ? 'กำลังสร้าง...' : 'ส่งทิกเก็ต' }}
+              </button>
+            </div>
+          </form>
+        </div>
+        <div class="ticket-controls">
+          <div class="ticket-tabs-bar" *ngIf="!showClosedTickets">
+            <div class="ticket-tabs">
+              <button
+                type="button"
+                class="ticket-tab"
+                [class.active]="activeCategory === 'all'"
+                (click)="activeCategory = 'all'"
+              >
+                ทั้งหมด
+                <span class="ticket-tab-count">{{ getActiveTicketCount() }}</span>
+              </button>
+              <button
+                type="button"
+                class="ticket-tab"
+                [class.active]="activeCategory === 'open'"
+                (click)="activeCategory = 'open'"
+              >
+                ใหม่
+                <span class="ticket-tab-count">
+                  {{ countByStatus('open') }}
+                </span>
+              </button>
+              <button
+                type="button"
+                class="ticket-tab"
+                [class.active]="activeCategory === 'in_progress'"
+                (click)="activeCategory = 'in_progress'"
+              >
+                กำลังดำเนินการ
+                <span class="ticket-tab-count">
+                  {{ countByStatus('in_progress') }}
+                </span>
+              </button>
+              <button
+                type="button"
+                class="ticket-tab"
+                [class.active]="activeCategory === 'unassigned'"
+                (click)="activeCategory = 'unassigned'"
+              >
+                ยังไม่รับเคส
+                <span class="ticket-tab-count">
+                  {{ countUnassigned() }}
+                </span>
+              </button>
+            </div>
+            <span class="badge badge-neutral ticket-tabs-count-badge">{{ getActiveTicketCount() }} รายการ</span>
+          </div>
+          <div class="ticket-controls-row">
+            <div class="ticket-id-search">
+              <input
+                type="text"
+                inputmode="search"
+                enterkeyhint="search"
+                class="ticket-id-search-input"
+                placeholder="ค้นหา #ไอดีทิกเก็ต"
+                [(ngModel)]="ticketIdSearch"
+                (keydown.enter)="searchByTicketId()"
+              >
+              <button type="button" class="secondary-button" (click)="searchByTicketId()">ค้นหา</button>
+            </div>
+            <div class="ticket-quick-filters">
+              <button
+                type="button"
+                class="ticket-quick-filter"
+                [class.active]="filterHasAttachment"
+                (click)="filterHasAttachment = !filterHasAttachment"
+              >
+                มีไฟล์แนบเท่านั้น
+              </button>
+            </div>
+          </div>
+        </div>
       
         <div class="ticket-table ticket-main-layout">
           <div *ngFor="let t of getCategoryTickets()">
-          <div class="ticket-card-wrapper" [ngClass]="'priority-border-' + ((t.priority || 'unknown').toLowerCase())" [attr.data-ticket-id]="t.ID" style="border-left: 4px solid transparent; border-radius: 4px; overflow: hidden; background: white; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 100%;">
-            <div class="ticket-row" style="display: flex; flex-direction: column; gap: 8px; cursor: pointer; padding: 12px 16px; width: 100%; box-sizing: border-box;" (click)="toggleReplies(t, 'all')">
+          <div class="ticket-card-wrapper" [ngClass]="'priority-border-' + ((t.priority || 'unknown').toLowerCase())" [attr.data-ticket-id]="t.ID">
+            <div class="ticket-row" (click)="toggleReplies(t, 'all')">
               <div class="ticket-item-header">
                 <div class="ticket-item-content">
                   <div class="ticket-item-title">
@@ -257,6 +429,15 @@
                     >
                       คัดลอกเลข
                     </button>
+                    <span
+                      class="ticket-attachment-indicator"
+                      *ngIf="(t.attachments?.length || 0) > 0 || t.attachment_path"
+                      title="มีไฟล์แนบ"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                      </svg>
+                    </span>
                     {{ t.title }}
                   </div>
                   <div class="ticket-customer-info">
@@ -266,7 +447,7 @@
                 <span class="badge ticket-status-badge" [ngClass]="'status-' + (t.status || 'unknown')">{{ getStatusLabel(t.status) }}</span>
               </div>
               <div class="ticket-priority-row">
-                <span class="badge" [ngClass]="'priority-' + (t.priority || 'unknown')" style="border-radius: 9999px; padding: 4px 12px; font-size: 0.75em;">ความเร่งด่วน: {{ getPriorityLabel(t.priority) }}</span>
+                <span class="badge ticket-priority-badge" [ngClass]="'priority-' + (t.priority || 'unknown')">ความเร่งด่วน: {{ getPriorityLabel(t.priority) }}</span>
               </div>
             </div>
             <div class="ticket-detail-row" *ngIf="isRepliesVisible(t, 'all')">
@@ -289,10 +470,10 @@
         <span class="recent-dock-title">10 ทิกเก็ตล่าสุดจากลูกค้า</span>
         <span class="badge badge-neutral">{{ getRecentRepliedTickets().length }} รายการ</span>
       </div>
-      <div class="recent-dock-body" *ngIf="getRecentRepliedTickets().length > 0; else noRecentDock">
+        <div class="recent-dock-body" *ngIf="getRecentRepliedTickets().length > 0; else noRecentDock">
         <div class="recent-dock-item" *ngFor="let t of getRecentRepliedTickets()">
-          <div class="ticket-card-wrapper recent-dock-card" [ngClass]="'priority-border-' + ((t.priority || 'unknown').toLowerCase())" style="border-left: 4px solid transparent; border-radius: 4px; overflow: hidden; background: white; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 100%;">
-            <div class="ticket-row recent-dock-row" style="display: flex; flex-direction: column; gap: 6px; cursor: pointer; padding: 10px 12px; width: 100%; box-sizing: border-box;" (click)="openRecentInMain(t)">
+          <div class="ticket-card-wrapper recent-dock-card" [ngClass]="'priority-border-' + ((t.priority || 'unknown').toLowerCase())">
+            <div class="ticket-row recent-dock-row" (click)="openRecentInMain(t)">
               <div class="ticket-item-header">
                 <div class="ticket-item-content">
                   <div class="ticket-item-title recent-dock-title-row">
@@ -305,6 +486,15 @@
                     >
                       คัดลอกเลข
                     </button>
+                    <span
+                      class="ticket-attachment-indicator"
+                      *ngIf="(t.attachments?.length || 0) > 0 || t.attachment_path"
+                      title="มีไฟล์แนบ"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                      </svg>
+                    </span>
                     {{ t.title }}
                   </div>
                   <div class="ticket-customer-info">
@@ -314,7 +504,7 @@
                 <span class="badge ticket-status-badge" [ngClass]="'status-' + (t.status || 'unknown')">{{ getStatusLabel(t.status) }}</span>
               </div>
               <div class="ticket-priority-row">
-                <span class="badge" [ngClass]="'priority-' + (t.priority || 'unknown')" style="border-radius: 9999px; padding: 3px 10px; font-size: 0.72em;">ความเร่งด่วน: {{ getPriorityLabel(t.priority) }}</span>
+                <span class="badge ticket-priority-badge" [ngClass]="'priority-' + (t.priority || 'unknown')">ความเร่งด่วน: {{ getPriorityLabel(t.priority) }}</span>
               </div>
             </div>
           </div>
@@ -352,14 +542,16 @@
           <div class="detail-meta-label">แท็ก</div>
           <div class="detail-meta-value" *ngIf="!t.tagsEditing">
             <span>{{ t.tags || '-' }}</span>
-            <button type="button" class="secondary-button ghost" *ngIf="isLoggedIn" (click)="startEditTags(t)" style="margin-left: 8px;">
+            <button type="button" class="secondary-button ghost tags-action-button" *ngIf="isLoggedIn" (click)="startEditTags(t)">
               แก้ไข
             </button>
           </div>
           <div class="detail-meta-value" *ngIf="t.tagsEditing">
             <input type="text" [(ngModel)]="t.tagsDraft" placeholder="คั่นด้วยเครื่องหมายจุลภาค เช่น bug, vip, ios">
-            <button type="button" class="secondary-button" (click)="saveTags(t)" style="margin-left: 6px;">บันทึก</button>
-            <button type="button" class="secondary-button ghost" (click)="cancelEditTags(t)" style="margin-left: 6px;">ยกเลิก</button>
+            <div class="tags-action-row">
+              <button type="button" class="secondary-button" (click)="saveTags(t)">บันทึก</button>
+              <button type="button" class="secondary-button ghost" (click)="cancelEditTags(t)">ยกเลิก</button>
+            </div>
           </div>
         </div>
         <div class="detail-meta-item">
@@ -570,7 +762,7 @@
             <input
               type="file"
               accept="image/*"
-              style="display: none;"
+              class="file-input-hidden"
               #fileInput
               (change)="onReplyAttachmentSelected($event, t)"
             >
@@ -581,7 +773,7 @@
               *ngIf="!t.newReplyAttachment"
               title="แนบรูปภาพ"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
+              <svg class="attach-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                 <circle cx="8.5" cy="8.5" r="1.5"></circle>
                 <polyline points="21 15 16 10 5 21"></polyline>
@@ -651,8 +843,8 @@
       <div class="detail-body">
         <div class="ticket-table">
           <div *ngFor="let t of getCategoryTickets()">
-            <div class="ticket-card-wrapper" [ngClass]="'priority-border-' + ((t.priority || 'unknown').toLowerCase())" style="border-left: 4px solid transparent; border-radius: 4px; overflow: hidden; background: white; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 100%;">
-              <div class="ticket-row" style="display: flex; flex-direction: column; gap: 8px; cursor: pointer; padding: 12px 16px; width: 100%; box-sizing: border-box;" (click)="toggleReplies(t, 'all')">
+            <div class="ticket-card-wrapper" [ngClass]="'priority-border-' + ((t.priority || 'unknown').toLowerCase())">
+              <div class="ticket-row" (click)="toggleReplies(t, 'all')">
                 <div class="ticket-item-header">
                   <div class="ticket-item-content">
                     <div class="ticket-item-title">
@@ -665,6 +857,15 @@
                       >
                         คัดลอกเลข
                       </button>
+                      <span
+                        class="ticket-attachment-indicator"
+                        *ngIf="(t.attachments?.length || 0) > 0 || t.attachment_path"
+                        title="มีไฟล์แนบ"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                        </svg>
+                      </span>
                       {{ t.title }}
                     </div>
                     <div class="ticket-customer-info">
@@ -674,7 +875,7 @@
                   <span class="badge ticket-status-badge" [ngClass]="'status-' + (t.status || 'unknown')">{{ getStatusLabel(t.status) }}</span>
                 </div>
                 <div class="ticket-priority-row">
-                  <span class="badge" [ngClass]="'priority-' + (t.priority || 'unknown')" style="border-radius: 9999px; padding: 4px 12px; font-size: 0.75em;">ความเร่งด่วน: {{ getPriorityLabel(t.priority) }}</span>
+                  <span class="badge ticket-priority-badge" [ngClass]="'priority-' + (t.priority || 'unknown')">ความเร่งด่วน: {{ getPriorityLabel(t.priority) }}</span>
                 </div>
               </div>
               <div class="ticket-detail-row" *ngIf="isRepliesVisible(t, 'all')">

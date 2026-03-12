@@ -21,6 +21,33 @@ export class TicketFormComponent {
     phone_number: ''
   };
 
+  department = '';
+  service = '';
+
+  readonly departmentOptions: string[] = [
+    'IT',
+    'บัญชี',
+    'การเงิน',
+    'บุคคล (HR)',
+    'จัดซื้อ',
+    'คลังสินค้า',
+    'ขาย',
+    'การตลาด',
+    'บริหาร',
+    'อื่นๆ'
+  ];
+
+  readonly serviceOptions: string[] = [
+    'แจ้งปัญหาโปรแกรม/ระบบ',
+    'ขอสิทธิ์เข้าใช้งาน',
+    'รีเซ็ตรหัสผ่าน/บัญชีผู้ใช้',
+    'อุปกรณ์คอมพิวเตอร์/ฮาร์ดแวร์',
+    'อินเทอร์เน็ต/เครือข่าย',
+    'เครื่องพิมพ์/สแกนเนอร์',
+    'อีเมล',
+    'อื่นๆ'
+  ];
+
   selectedFiles: File[] = [];
 
   constructor(private ticketService: TicketService) {}
@@ -50,9 +77,15 @@ export class TicketFormComponent {
     const title = (this.newTicket.title || '').trim();
     const description = (this.newTicket.description || '').trim();
     const phone = (this.newTicket.phone_number || '').trim();
+    const department = (this.department || '').trim();
+    const service = (this.service || '').trim();
 
     if (!title || !description || !phone) {
       this.formError.emit('กรุณากรอกข้อมูลให้ครบ รวมถึงเบอร์มือถือ');
+      return;
+    }
+    if (!department || !service) {
+      this.formError.emit('กรุณาเลือกหน่วยงานและงานบริการ');
       return;
     }
 
@@ -63,7 +96,9 @@ export class TicketFormComponent {
 
     const formData = new FormData();
     formData.append('title', title);
-    formData.append('description', description);
+    formData.append('department', department);
+    formData.append('service', service);
+    formData.append('description', `จากหน่วยงาน: ${department}\nงานบริการ: ${service}\n\n${description}`);
     formData.append('priority', this.newTicket.priority);
     formData.append('phone', phone);
 
@@ -79,6 +114,8 @@ export class TicketFormComponent {
       next: (createdTicket) => {
         this.ticketCreated.emit(createdTicket);
         this.newTicket = { title: '', description: '', priority: 'medium', phone_number: '' };
+        this.department = '';
+        this.service = '';
         this.selectedFiles = [];
       },
       error: (err) => {

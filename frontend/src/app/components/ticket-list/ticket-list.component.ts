@@ -63,6 +63,42 @@ export class TicketListComponent implements OnInit {
   filterHasAttachment = false;
   ticketIdSearch = '';
 
+  createTicketVisible = false;
+  creatingTicket = false;
+  createCustomerName = '';
+  createCustomerEmail = '';
+  createPhone = '';
+  createDepartment = '';
+  createService = '';
+  createTitle = '';
+  createDescription = '';
+  createPriority: 'low' | 'medium' | 'high' = 'medium';
+  createAttachments: File[] = [];
+
+  readonly departmentOptions: string[] = [
+    'IT',
+    'บัญชี',
+    'การเงิน',
+    'บุคคล (HR)',
+    'จัดซื้อ',
+    'คลังสินค้า',
+    'ขาย',
+    'การตลาด',
+    'บริหาร',
+    'อื่นๆ'
+  ];
+
+  readonly serviceOptions: string[] = [
+    'แจ้งปัญหาโปรแกรม/ระบบ',
+    'ขอสิทธิ์เข้าใช้งาน',
+    'รีเซ็ตรหัสผ่าน/บัญชีผู้ใช้',
+    'อุปกรณ์คอมพิวเตอร์/ฮาร์ดแวร์',
+    'อินเทอร์เน็ต/เครือข่าย',
+    'เครื่องพิมพ์/สแกนเนอร์',
+    'อีเมล',
+    'อื่นๆ'
+  ];
+
   private attachmentImageState: Record<string, { loaded: boolean; error: boolean }> = {};
   private attachmentMeta: Record<string, { fileName: string; fileSizeLabel: string }> = {};
   private attachmentRenderPath: Record<string, string> = {};
@@ -71,6 +107,7 @@ export class TicketListComponent implements OnInit {
   private recentExpandedTicketIds = new Set<number>();
 
   activeCategory: 'all' | 'open' | 'in_progress' | 'closed' | 'unassigned' = 'all';
+  showClosedTickets = false;
   analyticsFromDate = '';
   analyticsToDate = '';
   quickReplies: string[] = [
@@ -692,12 +729,23 @@ export class TicketListComponent implements OnInit {
     ).length;
   }
 
+  getActiveTicketCount(): number {
+    return this.tickets.filter(t => !this.isTicketClosed(t)).length;
+  }
+
+  getClosedTicketCount(): number {
+    return this.tickets.filter(t => this.isTicketClosed(t)).length;
+  }
+
   countUnassigned(): number {
-    return this.tickets.filter(t => !t.assigned_to).length;
+    return this.tickets.filter(t => !this.isTicketClosed(t) && !t.assigned_to).length;
   }
 
   getCategoryTickets(): Ticket[] {
-    const sorted = this.sortTicketsNewestFirst(this.tickets);
+    const baseTickets = this.showClosedTickets
+      ? this.tickets.filter(t => this.isTicketClosed(t))
+      : this.tickets.filter(t => !this.isTicketClosed(t));
+    const sorted = this.sortTicketsNewestFirst(baseTickets);
     let filtered = sorted;
     switch (this.activeCategory) {
       case 'open':
@@ -720,6 +768,18 @@ export class TicketListComponent implements OnInit {
       filtered = filtered.filter(t => !!t.attachment_path);
     }
     return filtered;
+  }
+
+  openClosedTickets(): void {
+    this.showClosedTickets = true;
+    this.activeCategory = 'closed';
+    this.closeAllReplies();
+  }
+
+  backToActiveTickets(): void {
+    this.showClosedTickets = false;
+    this.activeCategory = 'all';
+    this.closeAllReplies();
   }
 
   getFilteredLogsByDateRange(): ActivityLog[] {
@@ -1321,9 +1381,10 @@ export class TicketListComponent implements OnInit {
     }
     const ticketId = ticket.ID;
     this.closeDetail();
-    this.activeCategory = 'all';
-    this.filterHasAttachment = false;
     const target = this.tickets.find(t => t.ID === ticket.ID) || ticket;
+    this.showClosedTickets = this.isTicketClosed(target);
+    this.activeCategory = this.showClosedTickets ? 'closed' : 'all';
+    this.filterHasAttachment = false;
     this.closeAllReplies();
     if (target.repliesLoaded) {
       target.showReplies = true;
@@ -1368,6 +1429,7 @@ export class TicketListComponent implements OnInit {
         ticket.newReplyMessage = '';
         ticket.newReplyAttachment = null;
         if (view === 'recent') {
+          this.showClosedTickets = false;
           this.activeCategory = 'all';
         }
         this.closeAllReplies();
@@ -1403,6 +1465,126 @@ export class TicketListComponent implements OnInit {
     }
     this.ticketIdSearch = `#${id}`;
     this.openRecentInMain(target);
+  }
+
+  private isTicketClosed(ticket: Ticket): boolean {
+    return (ticket.status || '').toLowerCase() === 'closed';
+  }
+
+  toggleCreateTicket(): void {
+    this.createTicketVisible = !this.createTicketVisible;
+    if (!this.createTicketVisible) {
+      this.resetCreateTicketForm();
+    }
+  }
+
+  onCreateAttachmentsSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const incoming = input.files ? Array.from(input.files) : [];
+    if (incoming.length === 0) {
+      this.createAttachments = [];
+      return;
+    }
+    const all = [...this.createAttachments, ...incoming];
+    if (all.length > 5) {
+      this.createAttachments = all.slice(0, 5);
+      this.openInfo('เลือกไฟล์ได้สูงสุด 5 ไฟล์ต่อทิกเก็ต');
+    } else {
+      this.createAttachments = all;
+    }
+  }
+
+  removeCreateAttachment(index: number): void {
+    this.createAttachments = this.createAttachments.filter((_, i) => i !== index);
+  }
+
+  getCreateSelectedFileNames(): string {
+    return (this.createAttachments || []).map(f => f.name).join(', ');
+  }
+
+  submitCreateTicket(): void {
+    if (!this.isLoggedIn) {
+      this.openInfo('กรุณาเข้าสู่ระบบเจ้าหน้าที่ก่อน');
+      return;
+    }
+    if (this.creatingTicket) {
+      return;
+    }
+
+    const title = this.createTitle.trim();
+    const description = this.createDescription.trim();
+    const phone = this.createPhone.trim();
+    const customerName = this.createCustomerName.trim();
+    const customerEmail = this.createCustomerEmail.trim();
+    const department = this.createDepartment.trim();
+    const service = this.createService.trim();
+
+    if (!customerName || !phone || !title || !description) {
+      this.openInfo('กรุณากรอกชื่อลูกค้า เบอร์โทร หัวข้อ และรายละเอียดให้ครบถ้วน');
+      return;
+    }
+    if (!department || !service) {
+      this.openInfo('กรุณาเลือกหน่วยงานและงานบริการ');
+      return;
+    }
+    if (!this.isValidThaiPhone(phone)) {
+      this.openInfo('กรุณากรอกเบอร์มือถือให้ถูกต้อง (ต้องเป็นตัวเลข 9–11 หลักขึ้นต้นด้วย 0)');
+      return;
+    }
+
+    const payload = new FormData();
+    payload.append('customer_name', customerName);
+    if (customerEmail) {
+      payload.append('customer_email', customerEmail);
+    }
+    payload.append('phone', phone);
+    payload.append('title', title);
+    payload.append('department', department);
+    payload.append('service', service);
+    payload.append('description', `จากหน่วยงาน: ${department}\nงานบริการ: ${service}\n\n${description}`);
+    payload.append('priority', this.createPriority);
+
+    this.createAttachments.slice(0, 5).forEach((file) => {
+      payload.append('attachments', file);
+    });
+
+    this.creatingTicket = true;
+    this.ticketService.createTicketAsAdmin(payload).subscribe({
+      next: (ticket) => {
+        this.tickets = [ticket, ...this.tickets];
+        this.openInfo(`สร้างทิกเก็ต #${ticket.ID} เรียบร้อยแล้ว`);
+        this.loadLogs();
+        this.createTicketVisible = false;
+        this.resetCreateTicketForm();
+        this.creatingTicket = false;
+      },
+      error: (err) => {
+        console.error('Error creating ticket as admin', err);
+        if (err?.error?.error === 'invalid phone number') {
+          this.openInfo('เบอร์โทรไม่ถูกต้อง');
+        } else {
+          this.openInfo('ไม่สามารถสร้างทิกเก็ตได้ กรุณาลองใหม่ หรือตรวจสอบการเชื่อมต่อเซิร์ฟเวอร์');
+        }
+        this.creatingTicket = false;
+      }
+    });
+  }
+
+  private isValidThaiPhone(phone: string): boolean {
+    const cleaned = phone.replace(/[^0-9]/g, '');
+    return /^0\d{8,10}$/.test(cleaned);
+  }
+
+  private resetCreateTicketForm(): void {
+    this.createCustomerName = '';
+    this.createCustomerEmail = '';
+    this.createPhone = '';
+    this.createDepartment = '';
+    this.createService = '';
+    this.createTitle = '';
+    this.createDescription = '';
+    this.createPriority = 'medium';
+    this.createAttachments = [];
   }
 
   onReplyAttachmentSelected(event: Event, ticket: Ticket): void {

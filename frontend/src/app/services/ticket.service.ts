@@ -85,6 +85,12 @@ export class TicketService {
     return this.http.post<Ticket>(this.apiUrl, payload, { headers });
   }
 
+  createTicketAsAdmin(payload: FormData): Observable<Ticket> {
+    const token = localStorage.getItem('agentToken');
+    const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;
+    return this.http.post<Ticket>(this.apiUrl, payload, { headers });
+  }
+
   assignTicket(id: number): Observable<Ticket> {
     const token = localStorage.getItem('agentToken');
     const headers = token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : undefined;

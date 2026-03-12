@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -923,7 +924,6 @@ func main() {
 			for _, t := range tickets {
 				deleteAttachmentPath(t.AttachmentPath)
 				deleteAttachmentPath(t.AttachmentThumbPath)
-				// delete multiple attachments
 				var atts []TicketAttachment
 				_ = DB.Where("ticket_id = ?", t.ID).Find(&atts).Error
 				for _, a := range atts {
@@ -1076,7 +1076,6 @@ func main() {
 
 			deleteAttachmentPath(ticket.AttachmentPath)
 			deleteAttachmentPath(ticket.AttachmentThumbPath)
-			// delete multiple attachments
 			var atts []TicketAttachment
 			_ = DB.Where("ticket_id = ?", ticket.ID).Find(&atts).Error
 			for _, a := range atts {
@@ -1114,6 +1113,9 @@ func main() {
 			}
 
 			customerID := uint(1)
+			actorRole := "customer"
+			actorName := ""
+			actorID := uint(0)
 
 			authHeader := c.GetHeader("Authorization")
 			if strings.HasPrefix(authHeader, "Bearer ") {
@@ -1129,16 +1131,70 @@ func main() {
 				if err == nil && parsedToken.Valid {
 					if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok {
 						role, _ := claims["role"].(string)
+						name, _ := claims["name"].(string)
+						sub, _ := claims["sub"]
+						switch v := sub.(type) {
+						case float64:
+							actorID = uint(v)
+						case int64:
+							actorID = uint(v)
+						case uint:
+							actorID = v
+						}
+						actorRole = role
+						actorName = name
+
 						if role == "customer" {
-							sub, _ := claims["sub"]
-							switch v := sub.(type) {
-							case float64:
-								customerID = uint(v)
-							case int64:
-								customerID = uint(v)
-							case uint:
-								customerID = v
+							if actorID != 0 {
+								customerID = actorID
 							}
+						} else if role == "Admin" {
+							customerName := strings.TrimSpace(c.PostForm("customer_name"))
+							customerEmail := strings.ToLower(strings.TrimSpace(c.PostForm("customer_email")))
+							if customerName == "" {
+								customerName = fmt.Sprintf("ลูกค้า %s", phone)
+							}
+							if customerEmail == "" {
+								digits := regexp.MustCompile(`\D+`).ReplaceAllString(phone, "")
+								if digits == "" {
+									c.JSON(http.StatusBadRequest, gin.H{"error": "invalid phone number"})
+									return
+								}
+								customerEmail = fmt.Sprintf("phone-%s@local.invalid", digits)
+							}
+
+							var customer User
+							findErr := DB.Where("email = ?", customerEmail).First(&customer).Error
+							if findErr != nil {
+								if errors.Is(findErr, gorm.ErrRecordNotFound) {
+									customer = User{
+										Name:  customerName,
+										Email: customerEmail,
+										Role:  "customer",
+									}
+									if err := DB.Create(&customer).Error; err != nil {
+										c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_create_customer"})
+										return
+									}
+								} else {
+									c.JSON(http.StatusInternalServerError, gin.H{"error": "failed_to_load_customer"})
+									return
+								}
+							} else {
+								changed := false
+								if strings.TrimSpace(customer.Name) == "" && customerName != "" {
+									customer.Name = customerName
+									changed = true
+								}
+								if strings.TrimSpace(customer.Role) == "" {
+									customer.Role = "customer"
+									changed = true
+								}
+								if changed {
+									_ = DB.Save(&customer).Error
+								}
+							}
+							customerID = customer.ID
 						}
 					}
 				}
@@ -1152,17 +1208,14 @@ func main() {
 			var attachmentPath string
 			var attachmentThumbPath string
 			var batchAttachments []struct{ Path, Thumb string }
-			// support multiple files under "attachments" or "attachments[]"
 			if form, ferr := c.MultipartForm(); ferr == nil && form != nil {
 				files := form.File["attachments"]
 				if len(files) == 0 {
 					files = form.File["attachments[]"]
 				}
-				// also support legacy single field "attachment"
 				if f, e := c.FormFile("attachment"); e == nil && f != nil {
 					files = append([]*multipart.FileHeader{f}, files...)
 				}
-				// cap to 5 files
 				if len(files) > 5 {
 					files = files[:5]
 				}
@@ -1183,7 +1236,6 @@ func main() {
 					attachmentThumbPath = batchAttachments[0].Thumb
 				}
 			} else {
-				// fallback legacy single
 				if file, err := c.FormFile("attachment"); err == nil && file != nil {
 					path, thumb, err := storeAttachment(c, file)
 					if err != nil {
@@ -1226,7 +1278,6 @@ func main() {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create ticket"})
 				return
 			}
-			// persist multi-attachments if any
 			if len(batchAttachments) > 0 {
 				var ta []TicketAttachment
 				for _, a := range batchAttachments {
@@ -1237,14 +1288,17 @@ func main() {
 					})
 				}
 				if err := DB.Create(&ta).Error; err != nil {
-					// non-fatal: continue
 					log.Printf("failed to save TicketAttachment for ticket %d: %v", ticket.ID, err)
 				}
 			}
 
 			DB.Preload("Customer").First(&ticket, ticket.ID)
 
-			logActivity(ticket.CustomerID, ticket.Customer.Name, "customer", "CREATE_TICKET", fmt.Sprintf("สร้างทิกเก็ต #%d: %s", ticket.ID, ticket.Title), c.ClientIP())
+			if actorRole == "Admin" && actorID != 0 && strings.TrimSpace(actorName) != "" {
+				logActivity(actorID, actorName, actorRole, "CREATE_TICKET", fmt.Sprintf("สร้างทิกเก็ต #%d ให้ลูกค้า %s (%s)", ticket.ID, ticket.Customer.Name, ticket.PhoneNumber), c.ClientIP())
+			} else {
+				logActivity(ticket.CustomerID, ticket.Customer.Name, "customer", "CREATE_TICKET", fmt.Sprintf("สร้างทิกเก็ต #%d: %s", ticket.ID, ticket.Title), c.ClientIP())
+			}
 
 			c.JSON(http.StatusCreated, ticket)
 		})

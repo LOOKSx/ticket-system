@@ -187,7 +187,7 @@
               กลับไปทิกเก็ตที่กำลังดำเนินการ
             </button>
             <button type="button" class="secondary-button" (click)="toggleCreateTicket()" *ngIf="!showClosedTickets">
-              {{ createTicketVisible ? 'ยกเลิก' : 'สร้างทิกเก็ตแทนลูกค้า' }}
+              {{ createTicketVisible ? 'ยกเลิก' : 'สร้างทิกเก็ต' }}
             </button>
             <span class="badge badge-neutral ticket-header-count-badge" *ngIf="showClosedTickets">{{ getClosedTicketCount() }} รายการ</span>
           </div>
@@ -334,7 +334,7 @@
                 class="primary-button"
                 [disabled]="creatingTicket"
               >
-                {{ creatingTicket ? 'กำลังสร้าง...' : 'ส่งทิกเก็ต' }}
+                {{ creatingTicket ? 'กำลังสร้าง...' : 'บันทึกทิกเก็ต' }}
               </button>
             </div>
           </form>
@@ -401,20 +401,17 @@
               <button type="button" class="secondary-button" (click)="searchByTicketId()">ค้นหา</button>
             </div>
             <div class="ticket-quick-filters">
-              <div class="ticket-sort">
-                <span class="ticket-sort-label">เรียง:</span>
-                <select
-                  class="ticket-sort-select"
-                  [(ngModel)]="ticketSortMode"
-                  (ngModelChange)="saveTicketSortMode()"
-                  name="ticketSortMode"
-                >
-                  <option value="newest">ใหม่ล่าสุด</option>
-                  <option value="oldest">เก่าที่สุด</option>
-                  <option value="recent_update">อัปเดตล่าสุด</option>
-                  <option value="priority_high">ความเร่งด่วนสูงก่อน</option>
-                </select>
-              </div>
+              <select
+                class="ticket-quick-filter"
+                [(ngModel)]="ticketSortMode"
+                (ngModelChange)="saveTicketSortMode()"
+                name="ticketSortMode"
+              >
+                <option value="newest">เรียง: ใหม่ล่าสุด</option>
+                <option value="oldest">เรียง: เก่าที่สุด</option>
+                <option value="recent_update">เรียง: อัปเดตล่าสุด</option>
+                <option value="priority_high">เรียง: ความเร่งด่วนสูงก่อน</option>
+              </select>
               <button
                 type="button"
                 class="ticket-quick-filter"

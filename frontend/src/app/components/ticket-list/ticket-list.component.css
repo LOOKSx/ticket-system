@@ -962,9 +962,6 @@
 
 .ticket-quick-filters{margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
-.ticket-sort{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid #cbd5e1;border-radius:9999px}
-.ticket-sort-label{font-size:12px;color:#64748b;white-space:nowrap}
-.ticket-sort-select{flex:1 1 auto;min-width:0;height:34px;border:0;background:transparent;font-size:13px}
 .ticket-quick-filter{padding:4px 12px;background:#fff;border:1px solid #cbd5e1;border-radius:100px;font-size:12px;color:#475569;cursor:pointer;transition:all .2s}
 .ticket-quick-filter:hover{border-color:#94a3b8}
 .ticket-quick-filter.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9}

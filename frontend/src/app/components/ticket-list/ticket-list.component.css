@@ -621,15 +621,7 @@
   padding-top: 14px;
 }
 
-.ticket-header-count-badge {
-  margin-left: auto;
-}
-
-.ticket-tabs-count-badge {
-  margin-left: auto;
-  white-space: nowrap;
-  flex: 0 0 auto;
-}
+.ticket-tabs-count-badge{margin-left:auto}
 
 .ticket-column-header-actions .secondary-button {
   height: 36px;
@@ -925,70 +917,18 @@
   }
 }
 
-.ticket-tabs-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.ticket-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-@media (max-width: 640px) {
-  .ticket-tabs-bar {
-    flex-wrap: nowrap;
-  }
-  .ticket-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
+.ticket-tabs-bar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.ticket-tabs{display:flex;gap:8px;flex-wrap:wrap;flex:1 1 auto;min-width:0}
+@media (max-width: 640px){
+  .ticket-tabs-bar{flex-wrap:nowrap}
+  .ticket-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .ticket-tabs::-webkit-scrollbar{display:none;}
-  .ticket-tab { flex: 0 0 auto; }
-  .ticket-column-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .ticket-column-header-actions {
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-    padding-top: 0;
-    gap: 8px;
-  }
-
-  .ticket-column-header-actions .secondary-button {
-    width: 100%;
-    justify-content: center;
-    height: 40px;
-  }
-
-  .ticket-header-count-badge {
-    align-self: flex-end;
-    margin-left: 0;
-  }
-
-  .ticket-controls-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-
-  .ticket-quick-filters {
-    margin-bottom: 0;
-    justify-content: flex-end;
-  }
+  .ticket-tab{flex:0 0 auto}
+  .ticket-column-header{flex-direction:column;align-items:flex-start;gap:10px}
+  .ticket-column-header-actions{width:100%;flex-direction:column;align-items:stretch;justify-content:flex-start;padding-top:0;gap:8px}
+  .ticket-column-header-actions .secondary-button{width:100%;justify-content:center;height:40px}
+  .ticket-controls-row{flex-direction:column;align-items:stretch;gap:10px}
+  .ticket-quick-filters{margin-bottom:0;justify-content:flex-end}
 }
 
 .ticket-tab {
@@ -1016,53 +956,23 @@
   border-color: #3b82f6;
 }
 
-.ticket-tab-count {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-}
+.ticket-tab-count{background:rgba(255,255,255,.2);padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600}
 
-.ticket-tab:not(.active) .ticket-tab-count {
-  background: rgba(0,0,0,0.1);
-}
+.ticket-tab:not(.active) .ticket-tab-count{background:rgba(0,0,0,.1)}
 
-.ticket-quick-filters {
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
+.ticket-quick-filters{margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
-.ticket-quick-filter {
-  padding: 4px 12px;
-  background: #fff;
-  border: 1px solid #cbd5e1;
-  border-radius: 100px;
-  font-size: 12px;
-  color: #475569;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.ticket-quick-filter:hover {
-  border-color: #94a3b8;
-}
-
-.ticket-quick-filter.active {
-  background: #0ea5e9;
-  color: white;
-  border-color: #0ea5e9;
-}
+.ticket-sort{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid #cbd5e1;border-radius:9999px}
+.ticket-sort-label{font-size:12px;color:#64748b;white-space:nowrap}
+.ticket-sort-select{flex:1 1 auto;min-width:0;height:34px;border:0;background:transparent;font-size:13px}
+.ticket-quick-filter{padding:4px 12px;background:#fff;border:1px solid #cbd5e1;border-radius:100px;font-size:12px;color:#475569;cursor:pointer;transition:all .2s}
+.ticket-quick-filter:hover{border-color:#94a3b8}
+.ticket-quick-filter.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
 
 @media (max-width: 640px) {
-  .ticket-quick-filter {
-    height: 36px;
-    padding: 0 14px;
-    font-size: 13px;
-  }
+  .ticket-quick-filters{width:100%;flex-direction:column;align-items:stretch;gap:10px}
+
+  .ticket-quick-filter{height:36px;padding:0 14px;font-size:13px}
   .ticket-card-wrapper:hover {
     transform: none;
   }

@@ -22,6 +22,7 @@ type ActionBars = {
 };
 
 type TicketColumnView = 'all' | 'recent';
+type TicketSortMode = 'newest' | 'oldest' | 'recent_update' | 'priority_high';
 
 @Component({
   selector: 'app-ticket-list',
@@ -62,6 +63,7 @@ export class TicketListComponent implements OnInit {
 
   filterHasAttachment = false;
   ticketIdSearch = '';
+  ticketSortMode: TicketSortMode = 'newest';
 
   createTicketVisible = false;
   creatingTicket = false;
@@ -556,11 +558,87 @@ export class TicketListComponent implements OnInit {
     });
   }
 
+  private sortTicketsOldestFirst(list: Ticket[]): Ticket[] {
+    return [...list].sort((a, b) => {
+      const aTime = a.CreatedAt ? Date.parse(a.CreatedAt) : NaN;
+      const bTime = b.CreatedAt ? Date.parse(b.CreatedAt) : NaN;
+
+      if (!Number.isNaN(aTime) && !Number.isNaN(bTime)) {
+        return aTime - bTime;
+      }
+
+      const aId = a.ID ?? 0;
+      const bId = b.ID ?? 0;
+      return aId - bId;
+    });
+  }
+
+  private sortTicketsByPriorityHighFirst(list: Ticket[]): Ticket[] {
+    const score = (priority?: string): number => {
+      switch ((priority || '').toLowerCase()) {
+        case 'high':
+          return 3;
+        case 'medium':
+          return 2;
+        case 'low':
+          return 1;
+        default:
+          return 0;
+      }
+    };
+    const newestFirst = this.sortTicketsNewestFirst(list);
+    return [...newestFirst].sort((a, b) => score(b.priority) - score(a.priority));
+  }
+
+  private sortTicketsByLatestUpdate(list: Ticket[]): Ticket[] {
+    const tsByTicket = new Map<Ticket, number>();
+    const getTs = (t: Ticket): number => {
+      const cached = tsByTicket.get(t);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const latest = this.getLatestUpdateAt(t);
+      const ts = latest ? Date.parse(latest) : NaN;
+      const value = Number.isNaN(ts) ? -Infinity : ts;
+      tsByTicket.set(t, value);
+      return value;
+    };
+
+    const newestFirst = this.sortTicketsNewestFirst(list);
+    return [...newestFirst].sort((a, b) => getTs(b) - getTs(a));
+  }
+
+  private sortTickets(list: Ticket[]): Ticket[] {
+    switch (this.ticketSortMode) {
+      case 'oldest':
+        return this.sortTicketsOldestFirst(list);
+      case 'priority_high':
+        return this.sortTicketsByPriorityHighFirst(list);
+      case 'recent_update':
+        return this.sortTicketsByLatestUpdate(list);
+      case 'newest':
+      default:
+        return this.sortTicketsNewestFirst(list);
+    }
+  }
+
+  saveTicketSortMode(): void {
+    localStorage.setItem('ticketSortMode', this.ticketSortMode);
+  }
+
+  private restoreTicketSortMode(): void {
+    const raw = (localStorage.getItem('ticketSortMode') || '').toLowerCase();
+    if (raw === 'newest' || raw === 'oldest' || raw === 'recent_update' || raw === 'priority_high') {
+      this.ticketSortMode = raw;
+    }
+  }
+
   ngOnInit(): void {
     this.syncLoginStateFromStorage();
     if (!this.isLoggedIn) {
       this.tryAutoLoginFromQuery();
     }
+    this.restoreTicketSortMode();
     this.initializeDateRange();
     if (this.isLoggedIn) {
       this.loadLogs();
@@ -745,29 +823,28 @@ export class TicketListComponent implements OnInit {
     const baseTickets = this.showClosedTickets
       ? this.tickets.filter(t => this.isTicketClosed(t))
       : this.tickets.filter(t => !this.isTicketClosed(t));
-    const sorted = this.sortTicketsNewestFirst(baseTickets);
-    let filtered = sorted;
+    let filtered = baseTickets;
     switch (this.activeCategory) {
       case 'open':
-        filtered = sorted.filter(t => (t.status || '').toLowerCase() === 'open');
+        filtered = baseTickets.filter(t => (t.status || '').toLowerCase() === 'open');
         break;
       case 'in_progress':
-        filtered = sorted.filter(t => (t.status || '').toLowerCase() === 'in_progress');
+        filtered = baseTickets.filter(t => (t.status || '').toLowerCase() === 'in_progress');
         break;
       case 'closed':
-        filtered = sorted.filter(t => (t.status || '').toLowerCase() === 'closed');
+        filtered = baseTickets.filter(t => (t.status || '').toLowerCase() === 'closed');
         break;
       case 'unassigned':
-        filtered = sorted.filter(t => !t.assigned_to);
+        filtered = baseTickets.filter(t => !t.assigned_to);
         break;
       default:
-        filtered = sorted;
+        filtered = baseTickets;
         break;
     }
     if (this.filterHasAttachment) {
       filtered = filtered.filter(t => !!t.attachment_path);
     }
-    return filtered;
+    return this.sortTickets(filtered);
   }
 
   openClosedTickets(): void {

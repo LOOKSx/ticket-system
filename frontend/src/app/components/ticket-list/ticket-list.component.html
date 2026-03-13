@@ -401,6 +401,20 @@
               <button type="button" class="secondary-button" (click)="searchByTicketId()">ค้นหา</button>
             </div>
             <div class="ticket-quick-filters">
+              <div class="ticket-sort">
+                <span class="ticket-sort-label">เรียง:</span>
+                <select
+                  class="ticket-sort-select"
+                  [(ngModel)]="ticketSortMode"
+                  (ngModelChange)="saveTicketSortMode()"
+                  name="ticketSortMode"
+                >
+                  <option value="newest">ใหม่ล่าสุด</option>
+                  <option value="oldest">เก่าที่สุด</option>
+                  <option value="recent_update">อัปเดตล่าสุด</option>
+                  <option value="priority_high">ความเร่งด่วนสูงก่อน</option>
+                </select>
+              </div>
               <button
                 type="button"
                 class="ticket-quick-filter"

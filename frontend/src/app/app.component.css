@@ -204,14 +204,14 @@
   cursor: pointer;
   white-space: nowrap;
   border: none;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  background: var(--primary);
   color: white;
   box-shadow: var(--shadow-sm);
 }
 
 .header-auth-button:hover {
-  transform: translateY(-1px);
   box-shadow: var(--shadow);
+  background: var(--primary-dark);
 }
 
 .header-auth-button:disabled {

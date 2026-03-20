@@ -20,7 +20,6 @@
 }
 
 .panel-my-tickets .ticket-card:hover {
-  transform: translateY(-4px);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   border-color: var(--primary-light);
 }
@@ -169,7 +168,6 @@
 .panel-my-tickets .attachment-pill:hover {
   background: var(--primary-subtle);
   border-color: var(--primary-light);
-  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 

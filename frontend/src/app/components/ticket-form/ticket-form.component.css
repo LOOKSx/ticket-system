@@ -31,8 +31,7 @@
   padding: 16px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(245, 158, 11, 0.3);
-  background: linear-gradient(to right, rgba(255, 251, 235, 0.8), rgba(255, 251, 235, 0.4));
-  backdrop-filter: blur(4px);
+  background: rgba(255, 251, 235, 0.9);
 }
 
 .auth-warning-title {
@@ -156,7 +155,6 @@
   background-color: var(--bg-surface);
   border-color: var(--text-muted);
   color: var(--text-main);
-  transform: translateY(-1px);
   box-shadow: var(--shadow);
 }
 
@@ -180,38 +178,4 @@
   margin-top: 12px;
   padding-top: 20px;
   border-top: 1px solid var(--border);
-}
-
-.primary-button {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  padding: 10px 24px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.primary-button:hover {
-  background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3);
-}
-
-.primary-button:active {
-  transform: translateY(0);
-}
-
-.primary-button:disabled {
-  background: var(--text-muted);
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
